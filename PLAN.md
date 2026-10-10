@@ -1,8 +1,8 @@
 # Document Intelligence Pipeline — Plan
 
 ## Context
-Learning project + portfolio piece. Takes messy contract PDFs → returns clean, cited, validated JSON. Built in phases; each phase ends with a measurable result + Srikar explaining it back.
-Goal: Srikar can explain every design choice + trade-off and reproduce it, not vibe-coded.
+Learning project + portfolio piece. Takes messy contract PDFs → returns clean, cited, validated JSON. Built in phases; each phase ends with a measurable result + user explaining it back.
+Goal: User can explain every design choice + trade-off and reproduce it, not vibe-coded.
 
 **The product (end state):** upload a contract + type a request ("parties, renewal term, any non-compete?") → JSON with each answer + exact quote from contract + needs-review flag.
 
@@ -27,9 +27,9 @@ Goal: Srikar can explain every design choice + trade-off and reproduce it, not v
 | Time | No estimates. Phase done when its "Done when" is met |
 
 ## Ownership rule
-- **Srikar owns the core (the "brain"):** schema, prompts, scoring, validation/citation/retry logic, experiment design, router rules, field planner, analysis, write-up.
+- **User owns the core (the "brain"):** schema, prompts, scoring, validation/citation/retry logic, experiment design, router rules, field planner, analysis, write-up.
 - **Claude owns infra (the "plumbing"):** setup, data loading, LLM client, DuckDB, runners, parser wrappers, scan degrader, FastAPI, Docker, Cloud Run, Phoenix wiring, charts.
-- Srikar can ask Claude for help on core tasks anytime — rule: Claude explains/hints, Srikar types the code.
+- User can ask Claude for help on core tasks anytime — rule: Claude explains/hints, user types the code.
 - Claude's code must be small, commented, and explained after each task.
 
 ## Candidate 12 fields (confirm in Phase 0)
@@ -46,13 +46,13 @@ src/docintel/
   data/      loader, splits            (Claude)
   llm/       OpenRouter client, cost   (Claude)
   store/     DuckDB                    (Claude)
-  schema/    Pydantic field models     (Srikar)
-  extract/   prompt + extractor        (Srikar)
-  validate/  validators, citation, retry (Srikar)
-  score/     precision/recall          (Srikar)
+  schema/    Pydantic field models     (User)
+  extract/   prompt + extractor        (User)
+  validate/  validators, citation, retry (User)
+  score/     precision/recall          (User)
   parse/     parser wrappers           (Claude) + degrader (Claude)
-  route/     router rules              (Srikar)
-  planner/   prompt → fields           (Srikar)
+  route/     router rules              (User)
+  planner/   prompt → fields           (User)
   api/       FastAPI                   (Claude)
 notebooks/   exploration + analysis
 tests/
@@ -70,7 +70,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 ## Phase 0 — Setup + understand the data
 **Done when:** CUAD loaded in DuckDB, 12 fields chosen, doc subset + dev/test split fixed, data card written.
 
-**Srikar**
+**User**
 - Explore CUAD in notebook: contract types, page counts, how often each category is present/absent, span lengths.
 - Choose 12 fields + doc subset (~100), justify (coverage of groups, presence rates, contract types).
 - Define dev/test split (stratified by contract type).
@@ -93,7 +93,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 **Why clean text first:** isolates extraction errors from parsing errors.
 **Done when:** per-field + per-group P/R table on dev set with cost/latency, logged as E1.
 
-**Srikar**
+**User**
 - Pydantic schema for 12 fields: each field = `value`, `quote` (verbatim), `found: bool`.
 - Extraction prompt v1 (system + user), versioned.
 - Scoring rules per field type: e.g. normalized exact match for dates/law; span overlap (token Jaccard ≥ threshold) for quotes; presence for yes/no. Define TP/FP/FN incl. "absent" cases. Write tests with hand-made examples.
@@ -113,7 +113,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 ## Phase 2 — Trust layer (the agentic part)
 **Done when:** before/after comparison vs E1: validation failure rate, hallucinated quotes caught, retry lift, needs-review rate. Logged E2.x.
 
-**Srikar**
+**User**
 - Pydantic validators (date sanity, expiration > start, enums, non-empty quote when found).
 - Citation check: quote must appear in source text (normalized/fuzzy), else fail.
 - Self-correction loop: on failure, send errors back to model, max 2 retries. Record attempts.
@@ -132,7 +132,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 ## Phase 3 — Parser comparison (OCR-style vs multimodal)
 **Done when:** quality-vs-cost chart for 3 parsers × (clean PDFs, degraded scans), per field group. Logged E3.x.
 
-**Srikar**
+**User**
 - Design experiment: which docs, how many degraded, what metric decides "better", what cost counts (parse + extraction tokens).
 - Run each parser end-to-end through Phase 2 pipeline on dev.
 - Analysis: where did multimodal win/lose and why (look at actual pages).
@@ -154,7 +154,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 **Only if Phase 3 shows multimodal wins on an identifiable subset.** Otherwise E4 = "router not justified" + evidence — valid result.
 **Done when:** router vs always-cheap vs always-multimodal on **test** split, quality + cost. Logged E4.
 
-**Srikar**
+**User**
 - Write routing rules from dev evidence (e.g. pypdf text empty/garbled ratio, chars per page, CER proxy).
 - Run all 3 strategies on test. Compare.
 
@@ -168,7 +168,7 @@ PLAN.md  EXPERIMENTS.md  README.md
 ## Phase 5 — Service: prompt → fields → cited JSON
 **Done when:** live Cloud Run URL; upload PDF + text request → cited JSON with needs_review flags; traces visible in Phoenix; planner eval logged E5.
 
-**Srikar**
+**User**
 - Field planner: map free-text request → known fields (catalog of 12) + flag unknown. Build schema dynamically from selected Pydantic sub-models.
 - Planner eval: ~30 hand-written requests with expected fields → precision/recall of planner.
 - Decide behavior for unknown fields (refuse vs best-effort unscored).
@@ -187,9 +187,9 @@ PLAN.md  EXPERIMENTS.md  README.md
 ---
 
 ## Phase 6 — Write-up
-**Done when:** README answers the 4 hiring questions with numbers traceable to run_ids; Srikar passes a mock interview.
+**Done when:** README answers the 4 hiring questions with numbers traceable to run_ids; user passes a mock interview.
 
-**Srikar**
+**User**
 - Write README narrative: problem, data choice, architecture, results, trade-offs, failures, what's next.
 
 **Claude — prompts**
