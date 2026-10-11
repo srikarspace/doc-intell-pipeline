@@ -7,15 +7,16 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 - **The user drives.** The user drafts core logic first (schema, prompts, scoring, validators, parser interface, planner), at least as a skeleton. Claude pairs: suggests, debugs, and writes boilerplate (API wiring, Docker, CI, UI) only when asked.
 - **Explain-back gate** before every commit: the user explains each changed file; Claude probes gaps.
 - **Never commit, push, or create branches.** The user commits after each part.
-- **User decisions stay the user's** (fields, schema, prompts, scoring, split rules, router thresholds, planner behaviour): options and evidence first, the user decides, then a reference in a `<details>` block.
+- **User decisions stay the user's** (fields, schema, prompts, scoring, split rules, planner behaviour): options and evidence first, the user decides, then a reference in a `<details>` block.
 - Stay within the current part's prompt in `PLAN.md`. No scope creep into later parts.
 - Never tune or peek at the **test** split for decisions; dev only.
 
 ## How to work with the user
 - User is a JS full-stack engineer, newer to Python. Define new terms on first use; compare to JS/npm/Express/lodash where useful.
 - Explain design (why it looks this way, main alternative) before code.
-- Docs follow the template in `PLAN.md`: concise, 200 to 450 lines, whole files in code blocks, "Remember this" box, predict-then-reveal examples.
-- No time estimates. Never write the user's name; refer to them as "user".
+- Docs follow the template in `PLAN.md` (testdriven.io FastAPI CRUD style): objectives, project tree, code added piece by piece with the file named before each block, "Here, we..." explanations, a real-output checkpoint after every step, full files in `<details>`, "Remember this" box, predict-then-reveal examples. About 700 visible lines max.
+- No TDD for now: one small invariant test file per part; quality comes from evals.
+- Deadline: 3 weeks (roadmap in `PLAN.md`). No time estimates inside docs. Never write the user's name; refer to them as "user".
 - Every experiment run: `run_id` in DuckDB + entry in `EXPERIMENTS.md`.
 
 ## Stack

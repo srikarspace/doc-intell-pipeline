@@ -11,15 +11,14 @@ Each part has notes in `learn/`:
 
 ## Roadmap
 
-| Phase | Topic | Parts | Status |
+| Week | Phase | Parts | Status |
 |---|---|---|---|
-| 0 | setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) data loader · 0c exploration · 0d fields + split | in progress |
-| 1 | baseline extraction | 1a schema + LLM client · 1b extraction · 1c scoring · 1d batch run | planned |
-| 2 | trust layer | 2a validators · 2b citation check · 2c retry loop · 2d experiments | planned |
-| 3 | parser comparison | 3a pypdf + Docling · 3b Qwen3-VL (subset) · 3c scans + CER (subset) · 3d experiment | planned |
-| 4 | router | 4a signals, rules, test-split comparison | stretch |
-| 5 | service (prod bar) | 5a planner · 5b API + auth/limits · 5c observability · 5d Docker + Cloud Run · 5e CI/CD · 5f UI | planned |
-| 6 | write-up | 6a figures · 6b README + mock interview | planned |
+| 1 | 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) data loader · 0c explore, fields, split | in progress |
+| 1–2 | 1 baseline extraction | 1a schema + LLM client · 1b extract + score · 1c batch run | planned |
+| 2 | 2 trust layer | 2a validators + citations · 2b retry + experiments | planned |
+| 2 | 3 parser comparison | 3a pypdf, Docling, Qwen3-VL · 3b scans + experiment | planned |
+| 3 | 4 service (prod bar) | 4a planner + API · 4b observability · 4c Docker, Cloud Run, CI · 4d UI | planned |
+| 3 | 5 write-up | figures, README, mock interview | planned |
 
 Full plan: [PLAN.md](./PLAN.md). Run log: [EXPERIMENTS.md](./EXPERIMENTS.md).
 

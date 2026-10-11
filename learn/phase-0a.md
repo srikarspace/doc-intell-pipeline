@@ -1,6 +1,16 @@
 # Phase 0a: project setup
 
-About an hour. Eight files, all already built. You type a little and run a lot.
+In this part you read the eight setup files, predict what each command will do, then run it. You
+type a little and run a lot.
+
+## Objectives
+
+By the end of this part you should be able to:
+
+1. Map each setup file to its npm equivalent (`package.json`, `package-lock.json`, `.nvmrc`).
+2. Explain why every command goes through `uv run`, and what `.venv/` is.
+3. Add a library with `uv add` and say which files change.
+4. Run the two checks every part ends with, `make test` and `make lint`, and read their failures.
 
 This part is different from the rest. The setup was built before the tutor model started, so
 instead of typing it you read each file, predict what a command will do, then run it. From 0b on
@@ -21,7 +31,7 @@ make nb       # open Jupyter in the browser
 ```
 
 Every later part depends on this. 0b puts the CUAD loader in `src/docintel/evals/`. Phase 1 adds
-`llm/`, `schema/`, `extract/`, `score/`. All of them are imported as `docintel.something`, run with
+`core/llm.py`, `domain/schema/`, `domain/extract/` and `evals/scorers.py`. All of them are imported as `docintel.something`, run with
 `uv run`, tested with `make test`, and checked with `make lint`. None of that works without the
 eight files below.
 
@@ -39,6 +49,22 @@ Gaps on purpose: there is no code yet that does anything with contracts. That st
 | `src/docintel/__init__.py` | turns the folder into an importable package (like `index.js`) |
 | `tests/test_smoke.py` | one test proving the package and libraries import |
 | `.gitignore` | keeps `.venv/`, `.env` and `data/` out of git |
+
+Your project structure (generated and private folders left out):
+
+```
+.
+├── .env.example
+├── .gitignore
+├── .python-version
+├── Makefile
+├── pyproject.toml
+├── uv.lock
+├── src/docintel/
+│   └── __init__.py
+└── tests/
+    └── test_smoke.py
+```
 
 Python help for this part: [`learn/py/phase-0a.md`](./py/phase-0a.md).
 
@@ -570,7 +596,7 @@ Delete both scratch files when done. `make test` and `make lint` are green again
 
 ---
 
-## Recap
+## Conclusion
 
 `pyproject.toml` and `uv.lock` describe the project and pin every library; `.venv/` is the
 installed copy, rebuilt with `uv sync`. `src/docintel/` is the package, installed in editable mode
@@ -580,6 +606,16 @@ later part ends with.
 1. A teammate clones the repo and runs `python3 -m pytest`. It fails with
    `ModuleNotFoundError: No module named 'pydantic'`. What happened, and what is the one-word fix?
 2. You run `uv add rich`. Name the three things that change, and which of them you commit.
+
+Go back through the objectives and check that you can do each one without notes.
+
+Looking for more challenges?
+
+1. Run `uv tree --invert --package pydantic-core` and explain who pulls it in.
+2. Add a `make check` target that runs lint and test in one go.
+3. Find where uv keeps its download cache (`uv cache dir`) and why a second `uv sync` is fast.
+
+Checklist (`../PLAN.md`): **uv/venv/pyproject/pytest/ruff vs npm**.
 
 Next, 0b: you delete the CUAD loader and type it back in, learning the CUAD format, why DuckDB, and
 why the `contracts` and `labels` tables look the way they do.
