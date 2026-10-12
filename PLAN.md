@@ -51,9 +51,23 @@ write boilerplate when I ask. Before I commit, run the explain-back gate: I expl
 file, you probe gaps. Never commit. End each doc's Conclusion with which checklist items in
 ../PLAN.md this part covers.
 
-Who I am. A full-stack JavaScript engineer (Node, Express, React, npm). Newer to Python. Define
-any Python, data, ML or LLM term the first time it shows up. JS analogies help (npm, Express,
-lodash, Promise). Short sentences, one idea each.
+Who I am. A full-stack JavaScript engineer (Node, Express, React, npm). Newer to Python. Not a
+native English speaker. Define any Python, data, ML or LLM term the first time it shows up. JS
+analogies help (npm, Express, lodash, Promise).
+
+Simple English (most important style rule). Write as if explaining to a smart 15-year-old whose
+first language is not English. learn/phase-0b.md is the reference for the level.
+- Short sentences: one idea each, about 15 words. Split any sentence with "and", "which" or ";"
+  doing two jobs.
+- Common words. Not "flatten", "payoff", "swallow", "wire together", "by construction",
+  "idempotent", "invariant" (unless defined). No idioms, no phrasal verbs that mean something
+  else ("fall back" -> "use the backup plan").
+- Start each doc with a "Words used in this part" list: every key term in one plain line plus a
+  tiny example.
+- Explain code as numbered steps of what happens, in order. Show a small concrete example (real
+  input -> real output) before the general rule.
+- Prefer lists over paragraphs. Paragraphs at most 3 short sentences.
+- Say "guess" instead of "predict". Avoid "vs", "e.g.", "i.e.", "x" for "times" in prose.
 
 Style: the testdriven.io FastAPI CRUD tutorial. Objectives up front ("By the end of this part
 you should be able to:"). Show the project tree after setup (mkdir/touch commands, then "You
@@ -69,7 +83,8 @@ No TDD. Code first, checked by checkpoints. One small test file per part, writte
 invariants that must never silently break. Quality of the pipeline is measured with evals.
 
 Keep it focused. About 700 visible lines at most (collapsed <details> full-file references do
-not count). If it cannot fit, split it into lettered parts. Say what we add, why the pipeline
+not count). Simple English comes first: if it cannot fit, split it into lettered parts rather
+than make the English denser. Say what we add, why the pipeline
 needs it, and what it changes in the bigger picture. Skip history and API trivia.
 
 Pull out the one idea. Every doc has a "Remember this" box holding the single most important
@@ -104,6 +119,9 @@ Each part's prompt below is the delta that follows the contract.
 # Phase N: <title>
 
 One or two lines: what you build in this part and how (piece by piece, checkpoint after each).
+
+## Words used in this part
+Every key term of the part, one plain line each plus a tiny example. Read before anything else.
 
 ## Objectives
 "By the end of this part you should be able to:" then 4 or 5 numbered, checkable skills.

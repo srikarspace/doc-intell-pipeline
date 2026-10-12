@@ -12,6 +12,7 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 - Never tune or peek at the **test** split for decisions; dev only.
 
 ## How to work with the user
+- User is not a native English speaker: docs and explanations use simple English (15-year-old level; rules in `PLAN.md` tutor contract, reference `learn/phase-0b.md`).
 - User is a JS full-stack engineer, newer to Python. Define new terms on first use; compare to JS/npm/Express/lodash where useful.
 - Explain design (why it looks this way, main alternative) before code.
 - Docs follow the template in `PLAN.md` (testdriven.io FastAPI CRUD style): objectives, project tree, code added piece by piece with the file named before each block, "Here, we..." explanations, a real-output checkpoint after every step, full files in `<details>`, "Remember this" box, predict-then-reveal examples. About 700 visible lines max.

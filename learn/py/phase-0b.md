@@ -1,18 +1,19 @@
 # Python for Phase 0b
 
-Covers the Python this part introduces; read sideways, one section at a time.
+This file explains the new Python in Part 0b. Read one section when the main doc links to it.
 
 <a id="py-1"></a>
 ## PY-1. pathlib: paths as objects
 
-`Path` is a file path you can do things with, instead of a string you glue together. `/` joins
-parts, like `path.join` in Node.
+In Python, a file path can be a `Path` object, not just a string. You can ask a `Path` things, like
+"what is the file name?" or "does this file exist?". You join parts with `/`, like `path.join` in
+Node.
 
 ```python
 txt_path = cuad_dir / "full_contract_txt" / f"{stem}.txt"
 ```
 
-Useful bits used in 0b:
+The ones we use in 0b, next to Node:
 
 | Python | Node |
 |---|---|
@@ -24,48 +25,71 @@ Useful bits used in 0b:
 | `folder.rglob("*")` (every file, any depth) | a recursive `fs.readdirSync` |
 | `p.mkdir(parents=True, exist_ok=True)` | `fs.mkdirSync(p, { recursive: true })` |
 
-f-strings (`f"{stem}.txt"`) are template literals: `` `${stem}.txt` ``.
+`f"{stem}.txt"` is an **f-string**. It is the same as a JS template string: `` `${stem}.txt` ``.
 
 <a id="py-2"></a>
 ## PY-2. Type hints
 
-Annotations after `:` and `->` say what a function takes and returns. Python does **not** check
-them at runtime; editors and type checkers do. Like TypeScript types that vanish at runtime.
+Type hints say what a function takes and what it gives back. They come after `:` and `->`.
 
 ```python
 def count_pages(pdf_path: Path | None) -> int | None:
 ```
 
-- `Path | None` is a union: `Path | null` in TS.
-- `dict[str, tuple[Path, str]]` is `Record<string, [Path, string]>`. A **tuple** is a fixed-size,
-  read-only list, often used to return two things: `return len(contracts), len(labels)`.
-- `def connect(path: Path | str = DB_PATH)`: `= DB_PATH` is a default argument, as in JS.
+Read it like this: "`count_pages` takes a `Path` or `None`, and gives back an `int` or `None`."
+
+Python does **not** check these hints when the code runs. Your editor and tools like mypy check
+them. This is like TypeScript: the types are gone when the code runs.
+
+More examples from 0b:
+
+- `Path | None` means "a Path or None". In TypeScript: `Path | null`.
+- `dict[str, tuple[Path, str]]` means "a dict with string keys, and each value is a pair (Path,
+  string)". In TypeScript: `Record<string, [Path, string]>`.
+- A **tuple** is a list with a fixed size that you cannot change. We often use it to return two
+  things at once: `return len(contracts), len(labels)`.
+- `def connect(path: Path | str = DB_PATH)`: the `= DB_PATH` part is a default value, the same as
+  in JS.
 
 <a id="py-3"></a>
 ## PY-3. `with`: open, use, always close
 
-`with` runs setup, gives you the object, and guarantees cleanup when the block ends, even after an
-error. Files, zips and DB connections all support it.
+`with` opens something, lets you use it, and **always** closes it at the end. It closes it even
+if an error happens. Files, zip files and database connections all work with `with`.
 
 ```python
 with connect() as con:
     n_contracts, n_labels = load_cuad(con, cuad_dir)
-# con is closed here, error or not
+# here, con is closed, with or without an error
 ```
 
-The JS equivalent is a `try { ... } finally { con.close() }` you never have to write. Without
-`with`, an exception halfway through `load_cuad` could leave the DuckDB file locked.
+In JS, you would write this by hand:
+
+```js
+const con = connect();
+try { loadCuad(con, cuadDir); } finally { con.close(); }
+```
+
+Why it matters: if `load_cuad` crashes in the middle and nobody closes the connection, the DuckDB
+file can stay locked. Then other programs cannot open it.
 
 <a id="py-4"></a>
 ## PY-4. Comprehensions
 
-A comprehension builds a list or dict from a loop in one expression. Read it as `map` + `filter`.
+A **comprehension** builds a list or a dict from a loop, in one line. Think of it as `map` and
+`filter` together.
 
 ```python
 {_key(p.stem): (p, p.parent.name) for p in pdfs if p.suffix.lower() == ".pdf"}
 ```
 
-JS:
+Read it from the middle:
+
+1. `for p in pdfs`: go through each path.
+2. `if p.suffix.lower() == ".pdf"`: keep only PDF files.
+3. `_key(p.stem): (p, p.parent.name)`: for each one, add this key and value to the dict.
+
+The same thing in JS:
 
 ```js
 Object.fromEntries(
@@ -74,14 +98,15 @@ Object.fromEntries(
 )
 ```
 
-- `[x for x in items if cond]` makes a list, `{k: v for ...}` a dict.
-- Keep them to one condition. Anything longer reads better as a normal `for` loop.
+- `[x for x in items if cond]` makes a **list**. `{k: v for ...}` makes a **dict**.
+- Keep them short, with at most one `if`. If it gets longer, a normal `for` loop is easier to read.
 
 <a id="py-5"></a>
 ## PY-5. Generators and `yield`
 
-A function with `yield` returns a **generator**: it produces values one at a time, pausing between
-them. Same as a JS `function*`.
+A function with `yield` in it is a **generator**. It does not give back all values at once. It
+gives back one value, pauses, and waits until someone asks for the next one. This is the same as
+a `function*` in JS.
 
 ```python
 def iter_labels(cuad_dir: Path):
@@ -90,56 +115,74 @@ def iter_labels(cuad_dir: Path):
             yield row | ABSENT
 ```
 
+To get all the values, put it in `list(...)`:
+
 ```python
 labels = list(iter_labels(cuad_dir))   # run it to the end, collect every row
 ```
 
-- Nothing runs until something asks for values (`list(...)`, a `for` loop). Like `[...gen()]`.
-- Why not build a list inside? The generator keeps "how to make a row" separate from "what to do
-  with rows". A later part can stream rows elsewhere without touching the parser.
-- A generator can be consumed once. Call the function again for a fresh one.
+Things to know:
+
+- Nothing runs until something asks for values, like `list(...)` or a `for` loop. In JS:
+  `[...gen()]`.
+- Why not just build a list inside the function? Because then the function would decide what
+  happens to the rows. With `yield`, the function only makes rows. Whoever calls it decides what to
+  do with them (print one, save all, and so on).
+- You can only go through a generator once. To start again, call the function again.
 
 <a id="py-6"></a>
 ## PY-6. Dict merge `|` and the `or` default
 
-`a | b` makes a new dict with `b`'s keys added over `a`'s, like `{...a, ...b}`:
+**`a | b` merges two dicts.** It makes a new dict with the keys of `a`, plus the keys of `b`. If both
+have the same key, `b` wins. In JS: `{...a, ...b}`.
 
 ```python
 row = {"doc_id": doc["title"], "category": category}
 yield row | ABSENT    # {"doc_id": ..., "category": ..., "span_text": None, ...}
 ```
 
-Neither `row` nor `ABSENT` is changed. That matters for `ABSENT`, which is shared by every
-absent row.
+`row` and `ABSENT` do not change. This is important for `ABSENT`, because every absent row uses the
+same `ABSENT` dict.
 
-`x or default` returns `default` when `x` is "falsy" (`None`, `0`, `""`, empty list), like JS `||`:
+**`x or default` gives a backup value.** If `x` is "empty-ish", you get `default`. Empty-ish
+("falsy") values are `None`, `0`, `""` and empty lists. In JS: `x || default`.
 
 ```python
 pdf_path, contract_type = _lookup(pdfs, stem) or (None, None)
 ```
 
-`_lookup` returns a `(path, type)` tuple or `None`; `or (None, None)` keeps the unpacking on the
-left from crashing. Python has no `??`; `or` is the idiom, so mind values like `0` that are falsy.
+`_lookup` gives back a pair `(path, type)`, or `None` when there is no match. The left side wants
+two values. `None` is one value, so Python would crash. `or (None, None)` gives it two values.
+
+Python has no `??` like JS. People use `or`. But be careful: `0` is also falsy, so `0 or 5` gives
+`5`.
 
 <a id="py-7"></a>
 ## PY-7. `if __name__ == "__main__":`
 
-Every module has a `__name__`. When imported, it is the module's name (`"docintel.evals.datasets"`).
-When run as the program (`python -m docintel.evals.datasets`), it is `"__main__"`.
+Every Python file has a hidden variable called `__name__`. Its value depends on how the file is
+used:
+
+- When another file **imports** it, `__name__` is the module name, like
+  `"docintel.evals.datasets"`.
+- When you **run** it directly (`python -m docintel.evals.datasets`), `__name__` is `"__main__"`.
 
 ```python
 if __name__ == "__main__":
     main()
 ```
 
-So `make data` runs `main()`, while tests can `import load_cuad` without starting a 106 MB
-download. Node equivalent: `if (require.main === module) main()`.
+So `make data` runs the file, and `main()` runs. But when the test imports `load_cuad` from this
+file, `main()` does not run, so the test does not start a 106 MB download.
+
+In Node, the same idea is: `if (require.main === module) main()`.
 
 <a id="py-8"></a>
 ## PY-8. pytest fixtures and `tmp_path`
 
-A **fixture** is a function pytest runs before a test to build what it needs. A test asks for it by
-naming it as a parameter. No imports, no calls: pytest matches by name.
+A **fixture** is a function that pytest runs before a test. It prepares something the test needs,
+like a database. The test asks for a fixture by using its name as a parameter. You do not import
+it or call it. pytest matches the name for you.
 
 ```python
 @pytest.fixture
@@ -153,11 +196,13 @@ def test_absent_label_is_a_row(con):   # gets a loaded DB
     ...
 ```
 
-- `@pytest.fixture` is a **decorator**: a function that wraps the one below it. Think of a
-  higher-order function applied at definition time.
-- `tmp_path` is a built-in fixture: a fresh empty temp folder per test, deleted later. Jest's
-  closest equivalent is creating a temp dir in `beforeEach`.
-- Fixtures can use fixtures (`con` uses `cuad_dir` uses `tmp_path`). Each test gets fresh copies,
-  so tests never share state.
-- `yield` in a fixture splits setup (before) from teardown (after), like `beforeEach` + `afterEach`
-  in one function.
+Things to know:
+
+- `@pytest.fixture` is a **decorator**. A decorator is a function that wraps the function below
+  it, to add extra behavior. Here, it tells pytest "this is a fixture".
+- `tmp_path` is a fixture that pytest gives you for free. It is a new, empty folder for each test.
+  pytest deletes it later. In Jest, you would make a temp folder in `beforeEach`.
+- Fixtures can use other fixtures. `con` uses `cuad_dir`, and `cuad_dir` uses `tmp_path`. Each test
+  gets fresh copies, so one test cannot change data for another test.
+- `yield` in a fixture splits it into two halves. The code before `yield` runs before the test
+  (like `beforeEach`). The code after `yield` runs after the test (like `afterEach`).
