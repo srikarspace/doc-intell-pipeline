@@ -4,7 +4,7 @@ install:  ## install all deps (incl. dev) into .venv
 	uv sync
 
 data:  ## download CUAD into data/raw/ + load DuckDB (data/docintel.duckdb)
-	uv run python -m docintel.data
+	uv run python -m docintel.evals.datasets
 
 test:  ## run pytest
 	uv run pytest
