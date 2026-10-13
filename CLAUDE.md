@@ -10,6 +10,7 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 - **User decisions stay the user's** (fields, schema, prompts, scoring, split rules, planner behaviour): options and evidence first, the user decides, then a reference in a `<details>` block.
 - Stay within the current part's prompt in `PLAN.md`. No scope creep into later parts.
 - Never tune or peek at the **test** split for decisions; dev only.
+- Never read `LEARN.md` its for my learning purpose.
 
 ## How to work with the user
 - User is not a native English speaker: docs and explanations use simple English (15-year-old level; rules in `PLAN.md` tutor contract, reference `learn/phase-0b.md`).

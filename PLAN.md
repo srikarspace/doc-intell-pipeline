@@ -212,7 +212,7 @@ by anchor instead of repeating them. The phase doc links in with
 | Tooling | Python 3.12, uv, pytest, ruff, Jupyter, Makefile |
 | Time | 3 weeks, one part per working day (see Roadmap). No time estimates inside docs |
 
-## Candidate 12 fields (confirmed in Phase 0c)
+## Candidate 12 fields (confirmed in Phase 0d)
 
 | Group | Fields | Answer shape |
 |---|---|---|
@@ -260,8 +260,9 @@ day. Parts were merged to fit; the router is cut (README future work).
 | Week | Part | Topic | What it builds | Status |
 |---|---|---|---|---|
 | 1 | 0a | setup | uv project, deps, Makefile, ruff, pytest (read and run) | done |
-| 1 | 0b | data loader | CUAD download, `contracts` + `labels` tables, invariant test | doc ready |
-| 1 | 0c | explore, fields, split | notebook (6 questions), choose 12 fields + doc subset, `make_splits`, E0 | planned |
+| 1 | 0b | data loader | CUAD download, `contracts` + `labels` tables, invariant test | done |
+| 1 | 0c | explore | notebook `00_explore.ipynb`: 6 questions, 6 findings (no `src/` code) | doc ready |
+| 1 | 0d | fields, subset, split | choose 12 fields + doc subset + split rules, `make_splits`, test, E0 | doc ready |
 | 1 | 1a | schema + LLM client | Pydantic field models, OpenRouter client with json_schema, `llm_calls` log | planned |
 | 1 | 1b | extract + score | prompt v1, `extract()`, scoring rules, `evals/scorers.py` | planned |
 | 2 | 1c | batch run | runner with run_id, concurrency, resume; P/R table; E1 | planned |
@@ -301,13 +302,15 @@ and what "absent" labels mean for scoring.
 > tests/test_data_load.py on a 2-contract fake CUAD. Test: `make data` prints 510 contracts,
 > 28031 label rows; zero NULL pdf_path; `make test` green."
 
-> **0c Explore, fields, split (user decisions):** "I create notebooks/00_explore.ipynb (DuckDB
-> connection cell first) and answer 6 questions: contracts per type, contract length vs context
-> window, presence rate per category, spans per contract, span length, related-contract families.
-> For each: why it matters later, a query on a narrow slice with predict-then-run, then the full
-> query and a Finding cell. Teach the SQL as it appears (GROUP BY, FILTER, CTEs, JOIN USING,
-> quantiles) with lodash analogies in the companion. Then, from my findings, choose the 12 fields
-> and the ~100-doc subset (options + evidence, I decide, reference in <details>), and the split
+> **0c Explore:** "I create notebooks/00_explore.ipynb (DuckDB connection cell first) and answer
+> 6 questions: contracts per type, contract length vs context window, presence rate per
+> category, spans per contract, span length, related-contract families. For each: why it matters
+> later, a query on a narrow slice with predict-then-run, then the full query and a Finding cell.
+> Teach the SQL as it appears (GROUP BY, FILTER, CTEs, JOIN USING, quantiles) with lodash
+> analogies in the companion."
+
+> **0d Fields, subset, split (user decisions):** "From my 0c findings, choose the 12 fields and
+> the ~100-doc subset (options + evidence, I decide, reference in `<details>`), and the split
 > rules (stratify by type, related contracts on one side). Implement `make_splits(seed)` in
 > evals/datasets.py writing `splits(doc_id, split)`, deterministic, with a small test. Finish
 > with E0 in EXPERIMENTS.md."

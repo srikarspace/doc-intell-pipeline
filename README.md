@@ -13,7 +13,7 @@ Each part has notes in `learn/`:
 
 | Week | Phase | Parts | Status |
 |---|---|---|---|
-| 1 | 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) data loader · 0c explore, fields, split | in progress |
+| 1 | 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) data loader · [0c](./learn/phase-0c.md) explore · [0d](./learn/phase-0d.md) fields, subset, split | in progress |
 | 1–2 | 1 baseline extraction | 1a schema + LLM client · 1b extract + score · 1c batch run | planned |
 | 2 | 2 trust layer | 2a validators + citations · 2b retry + experiments | planned |
 | 2 | 3 parser comparison | 3a pypdf, Docling, Qwen3-VL · 3b scans + experiment | planned |
@@ -36,7 +36,7 @@ The files are downloaded to `data/raw/`, which is gitignored.
 
 ## Inspecting the data
 
-`make data` downloads CUAD and loads it into `data/docintel.duckdb` (tables: `contracts`, `labels`). To browse it, use the DuckDB CLI:
+`make data` downloads CUAD and loads it into `data/docintel.duckdb` (tables: `contracts`, `labels`; from Part 0d also `splits`). To explore it with SQL in Jupyter, run `make nb` (see `notebooks/00_explore.ipynb`). To browse it from the terminal, use the DuckDB CLI:
 
 ```bash
 brew install duckdb
@@ -54,4 +54,4 @@ SELECT category, count(*) FILTER (is_present) AS present
 FROM labels GROUP BY 1 ORDER BY 2 DESC;
 ```
 
-DuckDB allows one writer at a time. If another process (e.g. `make data` or a notebook) has the file open, use `duckdb -readonly data/docintel.duckdb`.
+DuckDB allows one writer at a time. If another process (like `make data` or a notebook) has the file open, use `duckdb -readonly data/docintel.duckdb`. `make data` needs the file alone, so close notebook connections first.
