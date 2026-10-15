@@ -9,6 +9,7 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 
 #### Data Preparation
 - We have to understand the data so that we can divide training data vs actual test data so. We will have all categories of data in both and also condense duplicates if any so that we don't create wrong data sets. We use dev data to develop and tune the agent and then use test only at the end. We use test in the end to actually get the numbers of how the agent is performing.
+    - Use subset of the data
     - From the agent response we can't measure everything so its better to check the few important once. We pick items where we have enough examples to test. Check with product what to choose and what is important to keep. Important fields should be reliably consistent.
     - We need to create a seed and use it to generate dev and test splits from the data so that some one uses the repo to run dev and test they would use the same data.
     - Its also about families, we cant split families of data into dev and test. Because we tune dev with a similar family item and test it later with one of the family item right which can impact the data. So we need to make sure we use a similar family data in either dev or test. Not in both.
