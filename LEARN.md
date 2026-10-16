@@ -45,5 +45,11 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - We have to create the `call_llm()` that makes the call to the LLM, verifies the response and logs the response to DuckDB.
 - Here we decide when to recall the LLM. A bad response is not an error its bad result. We can retry with the base result.
 - Status code: 429 is for rate limit. If the requests limit has reached. We can retry in this scenario.
-- We need to log cost and time. Every request need this to analyze later.
+- We need to log cost, time, response and error. Every request need this to analyze later. We can add them to a db table or to a logging server.
+- `Temperature=0` - Model picks the right answer.
+- We retry ourselves only for Network error and Ratelimit errors but leave the SDK to retry on it self. We return the rest to caller in the agent.
+- `require_parameters=True` - Open router passes the request to a model provider who would actually return the response in users request format.
+
+
+
 

@@ -221,3 +221,5 @@ __marimo__/
 
 # Project data (CUAD PDFs, DuckDB files)
 data/
+
+*vscode
