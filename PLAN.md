@@ -346,7 +346,9 @@ scoring threshold; which fields are weakest and a hypothesis why.
 > --model X --prompt-version v1`, stores `predictions(run_id, doc_id, field, value, quote, found,
 > ...)`, calls `score(run_id)`, concurrency limit, resume if interrupted. Estimate cost before
 > running. Results: P/R per field and per group, total cost, p50/p95 latency, bar chart per field.
-> Experiment: E1."
+> Experiment: E1 (baseline model `qwen/qwen3-235b-a22b-2507`). Then E1.1: same run with 2-3 newer
+> open-weight models (e.g. a Qwen3.6/3.8 open model, DeepSeek V4 Flash; confirm open weights
+> first), P/R vs cost per model; which model to keep is a user decision."
 
 ---
 
