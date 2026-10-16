@@ -3,10 +3,12 @@
 import csv
 import hashlib
 import json
+import random
 import re
 import unicodedata
 import urllib.request
 import zipfile
+from collections import defaultdict
 from pathlib import Path
 
 import duckdb
@@ -17,6 +19,21 @@ from docintel.evals.store import connect
 CUAD_URL = "https://zenodo.org/records/4595826/files/CUAD_v1.zip?download=1"
 CUAD_MD5 = "c38f490a984420b8a62600db401fafd5"
 RAW_DIR = Path("data/raw")
+
+FIELDS = {
+    "basic facts": ["Parties", "Agreement Date", "Governing Law"],
+    "yes/no + quote": ["Non-Compete", "Change Of Control", "Anti-Assignment"],
+    "numbers/terms": [
+        "Renewal Term",
+        "Notice Period To Terminate Renewal",
+        "Cap On Liability",
+    ],
+    "license/IP": [
+        "License Grant",
+        "Ip Ownership Assignment",
+        "Non-Transferable License",
+    ],
+}
 
 
 def _md5(path: Path) -> str:
@@ -153,11 +170,79 @@ def load_cuad(con: duckdb.DuckDBPyConnection, cuad_dir: Path) -> tuple[int, int]
     return len(contracts), len(labels)
 
 
+# same type contract in different folders
+SAME_TYPE = {
+    "Affiliate Agreement": "Affiliate_Agreements",
+    "Endorsement Agreement": "Endorsement",
+    "Joint Venture _ Filing": "Joint Venture",
+}
+
+
+def family(doc_id: str) -> str:
+    """Company part of a doc_id: the text before the first "_" or " - ", lowercase."""
+    return re.split(r"_| - ", doc_id, maxsplit=1)[0].lower()
+
+
+def group_families(rows: list[tuple[str, str]]) -> tuple[dict, dict]:
+    """family -> [doc_id, ...] and family -> type (the type of its first doc)."""
+    docs, ftype = defaultdict(list), {}
+    for doc_id, ctype in rows:
+        fam = family(doc_id)
+        docs[fam].append(doc_id)
+        ftype.setdefault(fam, SAME_TYPE.get(ctype, ctype))
+    return docs, ftype
+
+
+def pick_side(in_type: dict[str, int], overall: dict[str, int], dev_share: float) -> str:
+    """The side that is furthest below its share: first inside this type, then overall."""
+    for c in (in_type, overall):
+        target = dev_share * (c["dev"] + c["test"])
+        if c["dev"] < target:
+            return "dev"
+        if c["dev"] > target:
+            return "test"
+    return "dev"
+
+
+def make_splits(
+    con: duckdb.DuckDBPyConnection, seed: int = 0, n_docs: int = 100, dev_share: float = 0.5
+) -> dict[str, int]:
+    """Pick about n_docs contracts, stratified by type; a whole family goes to one side."""
+    rows = con.execute("SELECT doc_id, contract_type FROM contracts ORDER BY doc_id").fetchall()
+    docs, ftype = group_families(rows)
+    by_type = defaultdict(list)  # type -> [family, ...]
+    for fam in sorted(docs):
+        by_type[ftype[fam]].append(fam)
+
+    rng = random.Random(seed)
+    counts = {"dev": 0, "test": 0}
+    split_of = {}  # doc_id -> "dev" | "test"
+    for ctype in sorted(by_type):
+        fams = by_type[ctype]
+        rng.shuffle(fams)
+        quota = max(1, round(n_docs * sum(len(docs[f]) for f in fams) / len(rows)))
+        in_type = {"dev": 0, "test": 0}
+        for fam in fams:
+            if in_type["dev"] + in_type["test"] >= quota:
+                break
+            side = pick_side(in_type, counts, dev_share)
+            for doc_id in docs[fam]:
+                split_of[doc_id] = side
+            counts[side] += len(docs[fam])
+            in_type[side] += len(docs[fam])
+
+    con.execute("CREATE OR REPLACE TABLE splits (doc_id VARCHAR PRIMARY KEY, split VARCHAR)")
+    con.executemany("INSERT INTO splits VALUES (?, ?)", sorted(split_of.items()))
+    return counts
+
+
 def main() -> None:
     cuad_dir = download_cuad()
     with connect() as con:
         n_contracts, n_labels = load_cuad(con, cuad_dir)
+        counts = make_splits(con)
     print(f"Loaded {n_contracts} contracts, {n_labels} label rows")
+    print(f"Splits: {counts['dev']} dev, {counts['test']} test")
 
 
 if __name__ == "__main__":

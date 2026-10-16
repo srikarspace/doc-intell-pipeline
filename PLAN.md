@@ -263,7 +263,8 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 1 | 0b | data loader | CUAD download, `contracts` + `labels` tables, invariant test | done |
 | 1 | 0c | explore | notebook `00_explore.ipynb`: 6 questions, 6 findings (no `src/` code) | doc ready |
 | 1 | 0d | fields, subset, split | choose 12 fields + doc subset + split rules, `make_splits`, test, E0 | doc ready |
-| 1 | 1a | schema + LLM client | Pydantic field models, OpenRouter client with json_schema, `llm_calls` log | planned |
+| 1 | 1a | schema | Pydantic field models (strict), settings, `response_format`, schema test | doc ready |
+| 1 | 1a2 | LLM client | OpenRouter client: retries (network/429), `llm_calls` log, live call, fake-server test | doc ready |
 | 1 | 1b | extract + score | prompt v1, `extract()`, scoring rules, `evals/scorers.py` | planned |
 | 2 | 1c | batch run | runner with run_id, concurrency, resume; P/R table; E1 | planned |
 | 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | planned |
