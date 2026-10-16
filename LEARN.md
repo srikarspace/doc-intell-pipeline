@@ -30,14 +30,20 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 
 ### Phase 1: Create schema, LLM Client, extract, score in evals
 
-#### 1a: Create a schema
+#### 1a: Create a schema, LLM Client
 - We use pydantic to create a schema.
 - Its a Class which is used as both template and validation. We send it to the LLM to return response in a structured response. We also validate with the same Class. One file does two things.
-- Two configs to consider.
+- Three configs to consider when creating a schema and sending to LLM.
     - `extra="forbid"`: no extra props should be returned by the modal. Ex: expected `{"name":"sam"}` returned `{"name":"sam", "age": 20}`. This is a warning. It should match expectation.
     - `strict=True`: The expected response should always be returned. Ex: expected `{"is_present": True}` returned `{"is_present": "yes"}`. This is a warning. It should match expectation. If    `strict=False` then Class would convert it `yes` to `True`
-    - If both are not satisfied then a warning is thrown.
-    - We also request `Quotes` along with answer which is the proof of the data in the text.
+    - `required fields`: We have to pass the list of required fields so that LLM knows what not to miss.
+        - If three are not satisfied then a warning/error is thrown.
+        - We also request `Quotes` along with answer which is the proof of the data in the text.
 - `from pydantic import SecretStr` - Here `SecretStr` lets the LLM API know that not to log secrets and if logged they should be like `SecretStr('**********')`
 - `@lru_cache` - is like memoization is JS. First time it returns the function and next time it returns the function from cache.
 - The provider needs schema in JSON format so we need to convert the schema to JSON.
+- We have to create the `call_llm()` that makes the call to the LLM, verifies the response and logs the response to DuckDB.
+- Here we decide when to recall the LLM. A bad response is not an error its bad result. We can retry with the base result.
+- Status code: 429 is for rate limit. If the requests limit has reached. We can retry in this scenario.
+- We need to log cost and time. Every request need this to analyze later.
+

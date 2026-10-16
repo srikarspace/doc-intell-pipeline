@@ -265,7 +265,8 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 1 | 0d | fields, subset, split | choose 12 fields + doc subset + split rules, `make_splits`, test, E0 | doc ready |
 | 1 | 1a | schema | Pydantic field models (strict), settings, `response_format`, schema test | doc ready |
 | 1 | 1a2 | LLM client | OpenRouter client: retries (network/429), `llm_calls` log, live call, fake-server test | doc ready |
-| 1 | 1b | extract + score | prompt v1, `extract()`, scoring rules, `evals/scorers.py` | planned |
+| 1 | 1b | prompt + extract | prompt v1 (versioned files), `extract()`, live run on one dev contract, prompt test | doc ready |
+| 1 | 1b2 | scoring rules | `answers` table, match rules, TP/FP/FN outcome table, `evals/scorers.py`, scorer test | doc ready |
 | 2 | 1c | batch run | runner with run_id, concurrency, resume; P/R table; E1 | planned |
 | 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | planned |
 | 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
