@@ -50,6 +50,29 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - We retry ourselves only for Network error and Ratelimit errors but leave the SDK to retry on it self. We return the rest to caller in the agent.
 - `require_parameters=True` - Open router passes the request to a model provider who would actually return the response in users request format.
 
+#### 1b: Prompt v1 and Extract
+
+- The prompt(both system and user) is data not code. It lives in a versioned file with version name. Every run says which version was used. 
+    - Every new prompt is an experiment and the score can change and we want to know which exact version of prompt was used for what score.
+- Contract goes with the prompt but it never changes.
+- New prompt, new version, but contract never changes.
+- Once call per contract is cheap.
+- Good Prompt
+    - When extracting labels from text, its good practice to have label definitions.
+    - Add guard rails when data not available or any other request apart from labels extraction is provided
+- System Prompt: When extracting fields from docs
+    - Role of the LLM 
+    - Rules for every field:
+        - How should be the response for each field
+        - What should be responded if there is no value for a field
+        - Only add data if field exists
+    - Rules for field values:
+        - Special format of values for each field if present
+    - What each field means:
+        - These are the definitions for each field
+- User Prompt: Where we pass the content of the doc.
+- We load the prompt, build the message with prompt and contract and send the request to the llm with the message
+
 
 
 

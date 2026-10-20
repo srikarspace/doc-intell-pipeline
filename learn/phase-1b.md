@@ -96,7 +96,8 @@ Our example is a real dev contract:
 `EcoScienceSolutionsInc_20171117_8-K_EX-10.1_10956472_EX-10.1_Endorsement Agreement`. It is
 18,104 characters, about 4,500 tokens. 9 of the 12 fields are present.
 
-Guess before you open each box. The answers come from the run in Step 4.
+Guess before you open each box. The answers come from a real run in Step 4: model
+`qwen/qwen3-235b-a22b-2507`, prompt `v1`, temperature 0. Your run can differ a little.
 
 ### Round 1: a present field (Governing Law)
 
@@ -110,7 +111,21 @@ Guess the model's `value`. Then guess its quote: the whole sentence, or only the
 
 <details><summary>Guess, then open</summary>
 
-<!-- LIVE OUTPUT: governing_law from the user's run -->
+Real output:
+
+```json
+{"quotes": ["this Agreement, all amendments hereto, and any and all issues or controversies arising here from or related hereto, shall be governed by and construed exclusively in accordance with the laws and decisions of the State of Michigan."],
+ "value": "Michigan",
+ "found": true}
+```
+
+- `value` is `"Michigan"`, not `"State of Michigan"`. It follows the rule "only the state or
+  country".
+- The quote drops the opening words "Regardless of the place of execution hereof,". It is still
+  an exact copy, but it is shorter than the gold span. The token overlap with gold is 0.88. That
+  is above the 1b2 threshold of 0.5, so it still counts.
+- It keeps the typo "here from" as it is. The model copied the text and did not fix it. That is
+  what the exact-copy rule asks for.
 </details>
 
 ### Round 2: an absent field (Change Of Control)
@@ -120,7 +135,17 @@ have one. Guess `found` and `quotes`.
 
 <details><summary>Guess, then open</summary>
 
-<!-- LIVE OUTPUT: change_of_control from the user's run -->
+Real output:
+
+```json
+{"quotes": [], "found": false}
+```
+
+- Correct. The words "change of control" and "merger" are not in the contract.
+- The trap was section 15: "Neither this Agreement nor any of the rights or obligations contained
+  herein may be assigned or transferred by either party without the prior written consent of the
+  other party." That is **Anti-Assignment** (gold, start 12453), not change of control. The model
+  put it under `anti_assignment` only, so there is no false positive here.
 </details>
 
 ### Round 3: a list field (Parties)
@@ -131,7 +156,25 @@ and what it puts in `quotes`.
 
 <details><summary>Guess, then open</summary>
 
-<!-- LIVE OUTPUT: parties from the user's run -->
+Real output:
+
+```json
+{"quotes": ["THIS ENDORSEMENT AGREEMENT (the \"Agreement\") is dated as of this 14th day of November 2017 (\"Effective Date\"), by and between Eco Science Solutions, Inc. (\"ESSI\"), a Nevada corporation, and Stephen Marley (\"Talent\"), an individual."],
+ "value": ["Eco Science Solutions, Inc. (\"ESSI\")", "Stephen Marley (\"Talent\")"],
+ "found": true}
+```
+
+This is the interesting round. The model found the right parties, but it broke two rules:
+
+- **`quotes`: one long sentence, not 4 names.** The prompt says "quotes has each name and each
+  short name". The model copied the whole first sentence. That sentence is an exact copy, but its
+  token overlap with each gold span is low: 0.13, 0.03, 0.07 and 0.03. All four are under 0.5,
+  so 1b2 scores this field as wrong. The names are right, but the quote fails the rule.
+- **`value`: the short names are still in it.** `"Eco Science Solutions, Inc. (\"ESSI\")"`
+  should be `"Eco Science Solutions, Inc."`. The rule says short names go in `quotes` only.
+- Rule 2 in the prompt ("copy the shortest full sentence or clause") pulls the model toward full
+  sentences. For parties, that rule fights the parties rule. Write this down. It is the first
+  candidate change for prompt `v2`, after you see the 1c numbers.
 </details>
 
 ## Project setup
@@ -379,7 +422,8 @@ True
 1. Two messages, in order.
 2. The user message is 66 characters longer than the contract: the line and the tags around it.
 3. `True`: the whole contract is inside, exactly as it was.
-4. About 5,100 tokens of text, at 4 characters per token. The schema adds a few hundred more.
+4. About 5,100 tokens of text, at 4 characters per token. This is a rough guess. Step 4 shows the
+   real count.
 
 ## Step 3: `extract`
 
@@ -443,7 +487,21 @@ Path('data/examples').mkdir(exist_ok=True)
 Path('data/examples/ecoscience_v1.json').write_text(r.raw_text, encoding='utf-8')"
 ```
 
-<!-- LIVE OUTPUT: error/provider/attempts and tokens/cost/latency from the user's run -->
+Real output (your numbers will differ a little):
+
+```
+None Parasail 1
+4476 697 0.00118424 22304
+```
+
+- Line 1: no error. OpenRouter picked the provider Parasail, and it took 1 attempt.
+- Line 2: 4,476 prompt tokens. That is lower than the 5,114 we guessed in Step 2. Four characters
+  per token is only a rough rule, and this tokenizer packs legal English better.
+- 697 completion tokens. Most of them are the quotes.
+- The cost was about $0.0012, and the call took 22 seconds. One call at a time, the 52 dev
+  contracts would take many minutes. That is why 1c runs several calls at the same time.
+- If `error` isn't `None`, read it before anything else. A schema error means the provider
+  ignored `json_schema`.
 
 Here, we:
 
@@ -477,14 +535,24 @@ ORDER BY category, start_char
 └───────────────────┴────────────┴────────────┴──────────────────────────────────────────────────────────────┘
 ```
 
-And the model's answer for the same three fields:
+And the model's answer for the same three fields. Run this in the terminal. It reads the saved
+file, so there is no API call:
 
-```python
+```sh
+$ uv run python -c "
+from pathlib import Path
 from docintel.domain.schema.fields import ContractFields
-
-pred = ContractFields.model_validate_json(open("data/examples/ecoscience_v1.json").read())
-pred.governing_law, pred.change_of_control, pred.parties
+pred = ContractFields.model_validate_json(Path('data/examples/ecoscience_v1.json').read_text(encoding='utf-8'))
+for name in ['governing_law', 'change_of_control', 'parties']:
+    print(name, getattr(pred, name).model_dump_json())"
+governing_law {"quotes":["this Agreement, all amendments hereto, ... the State of Michigan."],"value":"Michigan","found":true}
+change_of_control {"quotes":[],"found":false}
+parties {"quotes":["THIS ENDORSEMENT AGREEMENT (the \"Agreement\") is dated as of ... an individual."],"value":["Eco Science Solutions, Inc. (\"ESSI\")","Stephen Marley (\"Talent\")"],"found":true}
 ```
+
+(The long quotes are cut with `...` here. Your terminal prints them in full.)
+
+`model_validate_json` passing is itself a check: the saved answer still fits `ContractFields`.
 
 Now open the three rounds in the Worked example. Write in your notebook, for each field: right,
 wrong, or "right, but the quote is shorter than the gold span".
@@ -673,7 +741,8 @@ Use the numbers for a first cost guess for 1c. In the notebook:
 con.sql("SELECT prompt_tokens, completion_tokens, cost_usd, latency_ms FROM llm_calls ORDER BY created_at DESC LIMIT 1")
 ```
 
-Dev has 52 contracts, about 13,000 tokens each on average. This one has about 5,100. Multiply
+Dev has 52 contracts, about 13,000 tokens each on average. This one has about 5,100 by the same
+4-characters rule. Multiply
 its cost by 52 times 13,000 / 5,100 for a rough cost of one dev run. Write that number in your
 notebook.
 
