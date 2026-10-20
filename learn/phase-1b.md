@@ -510,7 +510,35 @@ Here, we:
 3. Print the error (it should be `None`), the provider, tokens, cost and latency.
 4. Save the raw JSON answer in `data/examples/`. 1b2 scores this file. `data/` is not in git.
 
-Now open the notebook, run cell 1, and compare with the gold labels:
+Now open the notebook and run cell 1. First, check the row that the call wrote. Guess first: how
+many rows, and what is in `run_id`?
+
+```python
+con.sql("""
+SELECT schema_name, provider, ok, attempts, error, run_id, cost_usd, length(raw_text) AS chars
+FROM llm_calls
+ORDER BY created_at
+""")
+```
+
+```
+┌────────────────┬───────────┬─────────┬──────────┬─────────┬─────────┬────────────┬───────┐
+│  schema_name   │ provider  │   ok    │ attempts │  error  │ run_id  │  cost_usd  │ chars │
+├────────────────┼───────────┼─────────┼──────────┼─────────┼─────────┼────────────┼───────┤
+│ Text           │ DeepInfra │ true    │        1 │ NULL    │ NULL    │  2.203e-05 │   122 │
+│ ContractFields │ Parasail  │ true    │        1 │ NULL    │ NULL    │ 0.00118424 │  2707 │
+└────────────────┴───────────┴─────────┴──────────┴─────────┴─────────┴────────────┴───────┘
+```
+
+1. Two rows. The `Text` row is the tiny live call from 1a2. The `ContractFields` row is this one.
+2. `ok` is true and `error` is NULL: Pydantic accepted the answer.
+3. `run_id` is NULL. The runner fills it in 1c.
+4. There is no `doc_id` column. Only the order of the rows tells you which contract this was.
+   1c adds a `predictions` table with `doc_id`.
+5. `raw_text` is the whole answer for all 12 fields, as one string. It is the same text as
+   `data/examples/ecoscience_v1.json`. This table is a log of calls, not a table of answers.
+
+Then compare with the gold labels:
 
 ```python
 DOC = "EcoScienceSolutionsInc_20171117_8-K_EX-10.1_10956472_EX-10.1_Endorsement Agreement"

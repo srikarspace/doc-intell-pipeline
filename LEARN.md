@@ -72,6 +72,7 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
         - These are the definitions for each field
 - User Prompt: Where we pass the content of the doc.
 - We load the prompt, build the message with prompt and contract and send the request to the llm with the message
+- Once we get the response we extract the data and persist to logs
 
 
 
