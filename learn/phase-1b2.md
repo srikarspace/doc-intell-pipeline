@@ -128,16 +128,16 @@ full points. 25 of the 510 CUAD dates are year-only. This is a real decision, so
 
 ### Round 3: the lazy model
 
-Change Of Control is present in 18 of the 52 dev contracts. Model A always says "not there".
+Change Of Control is present in 10 of the 52 dev contracts. Model A always says "not there".
 Model B always says "there", with a good quote. Guess precision and recall for each.
 
 <details><summary>Guess, then open</summary>
 
-- **Model A**: TP 0, FP 0, FN 18, TN 34. Recall = 0 / 18 = 0. Precision = 0 / 0: no answer at
+- **Model A**: TP 0, FP 0, FN 10, TN 42. Recall = 0 / 10 = 0. Precision = 0 / 0: no answer at
   all, so we write it as empty, not as 0 or 1.
-- **Model B**: TP 18, FP 34, FN 0. Recall = 18 / 18 = 1.0. Precision = 18 / 52 = 0.35.
+- **Model B**: TP 10, FP 42, FN 0. Recall = 10 / 10 = 1.0. Precision = 10 / 52 = 0.19.
 
-Model A gets 34 of 52 right (65%), and is useless. That is why we report precision and recall,
+Model A gets 42 of 52 right (81%), and is useless. That is why we report precision and recall,
 not "percent correct". TNs make a lazy model look good.
 </details>
 
