@@ -134,13 +134,13 @@ test set holds a copy of a dev contract. That is leakage. Step 7 checks it.
 The empty `notebooks/Untitled.ipynb` is not needed. Remove it:
 
 ```sh
-$ git rm -q notebooks/Untitled.ipynb
+git rm -q notebooks/Untitled.ipynb
 ```
 
 Start Jupyter Lab:
 
 ```sh
-$ make nb
+make nb
 ```
 
 It opens in your browser, inside the `notebooks/` folder. Make a new notebook (File, New,
@@ -719,9 +719,12 @@ can disagree. 0d must pick which rule wins.
 Last, the duplicate from Round 2. Prove the two files are the same, from your terminal:
 
 ```sh
-$ cmp "data/raw/CUAD_v1/full_contract_txt/ADUROBIOTECH,INC_06_02_2020-EX-10.7-CONSULTING AGREEMENT.txt" \
+cmp "data/raw/CUAD_v1/full_contract_txt/ADUROBIOTECH,INC_06_02_2020-EX-10.7-CONSULTING AGREEMENT.txt" \
       "data/raw/CUAD_v1/full_contract_txt/ADUROBIOTECH,INC_06_02_2020-EX-10.7-CONSULTING AGREEMENT(1).txt" \
       && echo same
+```
+
+```text
 same
 ```
 
@@ -763,7 +766,10 @@ data/
 read-only query from the terminal does now:
 
 ```sh
-$ uv run python -c "import duckdb; duckdb.connect('data/docintel.duckdb', read_only=True)"
+uv run python -c "import duckdb; duckdb.connect('data/docintel.duckdb', read_only=True)"
+```
+
+```text
 _duckdb.IOException: IO Error: Could not set lock on file ".../data/docintel.duckdb":
 Conflicting lock is held in .../bin/python3.12 (PID ...) by user ...
 ```
@@ -803,8 +809,8 @@ Explain each finding to Claude in a few sentences (the rule in `PLAN.md`), and s
 decision it feeds. Then:
 
 ```sh
-$ git add notebooks/00_explore.ipynb
-$ git commit -m "phase 0c: explore CUAD in a notebook"
+git add notebooks/00_explore.ipynb
+git commit -m "phase 0c: explore CUAD in a notebook"
 ```
 
 ## Conclusion

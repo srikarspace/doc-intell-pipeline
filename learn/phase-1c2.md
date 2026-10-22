@@ -250,7 +250,7 @@ Checkpoint. A fake `extract` that waits one second shows the speed-up with no co
 answer, so each line says `ok=False`. Guess both times first (Round 1):
 
 ```sh
-$ uv run python - <<'EOF'
+uv run python - <<'EOF'
 import time
 from docintel.core.llm import LLMResult
 from docintel.evals import runner
@@ -270,6 +270,9 @@ with connect(":memory:") as con:
         print(f"concurrency {n}: {time.perf_counter() - start:.1f} s")
     print(runner.todo(con, "demo-4", ["doc-a", "doc-e"]))
 EOF
+```
+
+```text
 [1/4] doc-a  ok=False  $0.0000  1.0 s
 [2/4] doc-b  ok=False  $0.0000  1.0 s
 [3/4] doc-c  ok=False  $0.0000  1.0 s
@@ -379,7 +382,10 @@ Here, we:
 Checkpoint. The help text costs nothing:
 
 ```sh
-$ uv run python -m docintel.evals.runner --help
+uv run python -m docintel.evals.runner --help
+```
+
+```text
 usage: python -m docintel.evals.runner [-h] {run,score} ...
 
 positional arguments:
@@ -400,7 +406,10 @@ Try `run --help` too: one line per flag, with the `help=` text you wrote.
 Run 3 real contracts. Answer `y` at the prompt.
 
 ```sh
-$ uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3-235b-a22b-2507 --prompt-version v1 --limit 3
+uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3-235b-a22b-2507 --prompt-version v1 --limit 3
+```
+
+```text
 run 20261021-HHMMSS: 3 of 3 docs to do, qwen/qwen3-235b-a22b-2507, about $0.0051
 Start? [y/N] y
 ```
@@ -496,7 +505,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 12%]
@@ -847,7 +859,7 @@ This is E1: the baseline on the full dev split. 1c3 turns it into the results ta
 Close the notebook connection, then run:
 
 ```sh
-$ uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3-235b-a22b-2507 --prompt-version v1
+uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3-235b-a22b-2507 --prompt-version v1
 ```
 
 The first line prints the `run_id` and an estimate of about $0.087. Answer `y`. If any call
@@ -923,9 +935,9 @@ Explain each changed file to Claude in a few sentences (the rule in `PLAN.md`): 
 `test_runner.py` (the new test). Show the E1 check table and your E1 entry. Then:
 
 ```sh
-$ git status
-$ git add src/docintel/evals/runner.py tests/test_runner.py EXPERIMENTS.md notebooks/00_explore.ipynb
-$ git commit -m "phase 1c2: concurrent runner with resume and CLI, E1 run"
+git status
+git add src/docintel/evals/runner.py tests/test_runner.py EXPERIMENTS.md notebooks/00_explore.ipynb
+git commit -m "phase 1c2: concurrent runner with resume and CLI, E1 run"
 ```
 
 ## Conclusion

@@ -142,7 +142,7 @@ Run this check (no key needed). It reads each model's Hugging Face id from OpenR
 license from Hugging Face:
 
 ```sh
-$ uv run python - <<'EOF'
+uv run python - <<'EOF'
 import json
 import urllib.request
 
@@ -161,6 +161,9 @@ for model in MODELS:
     p = m["pricing"]
     print(f"{model:28} {float(p['prompt']) * 1e6:5.3f} {float(p['completion']) * 1e6:5.2f}  {license}")
 EOF
+```
+
+```text
 qwen/qwen3-235b-a22b-2507    0.090  0.55  license:apache-2.0
 qwen/qwen3.8-27b             0.040  1.35  license:apache-2.0
 qwen/qwen3.8-flash           0.150  0.47  license:other
@@ -197,13 +200,16 @@ Add any other model you want to try to `MODELS`, and check it the same way.
 First, estimate each candidate on the whole dev split:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.runner import cuad_txt, docs_for, estimate
 from docintel.evals.store import connect
 with connect() as con:
     texts = [cuad_txt(con, d) for d in docs_for(con, 'dev')]
 for m in ['qwen/qwen3-235b-a22b-2507', 'qwen/qwen3.8-27b', 'deepseek/deepseek-v4-flash', 'z-ai/glm-5.3-flash']:
     print(f'{m:28} {estimate(texts, m, \"v1\"):.3f}')"
+```
+
+```text
 qwen/qwen3-235b-a22b-2507    0.087
 qwen/qwen3.8-27b             0.096
 deepseek/deepseek-v4-flash   0.068
@@ -239,7 +245,7 @@ contracts show it for less than a cent.
 For each model you chose, run:
 
 ```sh
-$ uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3.8-27b --prompt-version v1 --limit 3
+uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model qwen/qwen3.8-27b --prompt-version v1 --limit 3
 ```
 
 Then look at its calls in the notebook:
@@ -335,7 +341,7 @@ DOCINTEL_MODEL=<the model you keep>
 Checkpoint. Guess first: which model does the runner use now, without `--model`?
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.config import get_settings
 print(get_settings().docintel_model)"
 ```
@@ -374,7 +380,7 @@ changes only the model.
 This is E1.1. For each chosen model, the pilot and then the full run:
 
 ```sh
-$ uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model <model> --prompt-version v1
+uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model <model> --prompt-version v1
 ```
 
 Each run prints its own `run_id`. The table in Step 4 has one row per model. Dev only: never run
@@ -414,9 +420,9 @@ Explain to Claude in a few sentences (the rule in `PLAN.md`): how you checked op
 keep rule, the comparison table, and why you kept the model you kept. Then:
 
 ```sh
-$ git status
-$ git add notebooks/00_explore.ipynb EXPERIMENTS.md .env.example
-$ git commit -m "phase 1c4: E1.1 open-weight model comparison"
+git status
+git add notebooks/00_explore.ipynb EXPERIMENTS.md .env.example
+git commit -m "phase 1c4: E1.1 open-weight model comparison"
 ```
 
 `.env` holds your key, so it is never committed. Only `.env.example` carries the model name.

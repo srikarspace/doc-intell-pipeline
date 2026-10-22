@@ -169,7 +169,10 @@ model misread the schema. We want to see it.
 Add the new library:
 
 ```sh
-$ uv add pydantic-settings
+uv add pydantic-settings
+```
+
+```text
 Resolved ... packages
 ...
  + pydantic-settings==2.16.0
@@ -178,10 +181,10 @@ Resolved ... packages
 Create the folders and empty files:
 
 ```sh
-$ mkdir -p src/docintel/core src/docintel/domain/schema
-$ touch src/docintel/core/__init__.py src/docintel/core/config.py src/docintel/core/llm.py
-$ touch src/docintel/domain/__init__.py src/docintel/domain/schema/__init__.py
-$ touch src/docintel/domain/schema/fields.py tests/test_schema.py
+mkdir -p src/docintel/core src/docintel/domain/schema
+touch src/docintel/core/__init__.py src/docintel/core/config.py src/docintel/core/llm.py
+touch src/docintel/domain/__init__.py src/docintel/domain/schema/__init__.py
+touch src/docintel/domain/schema/fields.py tests/test_schema.py
 ```
 
 You should now have:
@@ -292,12 +295,15 @@ find the right `labels` rows for each answer.
 Checkpoint. Guess the numbers first:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.domain.schema.fields import ContractFields
 s = ContractFields.model_json_schema()
 print(len(s['properties']), sorted(s['\$defs']))
 print(s['\$defs']['Clause']['required'])
 print(s['properties']['non_compete'])"
+```
+
+```text
 12 ['Clause', 'Names', 'Text']
 ['quotes', 'found']
 {'$ref': '#/$defs/Clause'}
@@ -425,11 +431,14 @@ DOCINTEL_MODEL=qwen/qwen3-235b-a22b-2507
 Checkpoint. Guess what the second line prints:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.config import get_settings
 s = get_settings()
 print(s.docintel_model, s.llm_max_attempts)
 print(repr(s.openrouter_api_key))"
+```
+
+```text
 qwen/qwen3-235b-a22b-2507 4
 SecretStr('**********')
 ```
@@ -485,11 +494,14 @@ The docstring at the top already describes the whole file. 1a2 adds the rest.
 Checkpoint:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 import json
 from docintel.core.llm import response_format
 from docintel.domain.schema.fields import Clause
 print(json.dumps(response_format(Clause), indent=2))"
+```
+
+```text
 {
   "type": "json_schema",
   "json_schema": {
@@ -590,7 +602,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 28%]
@@ -750,9 +765,9 @@ schema choice and its evidence), `config.py`, `llm.py` (what `response_format` s
 `test_schema.py` (each test), and the notebook "Schema" cell. Then:
 
 ```sh
-$ git status
-$ git add pyproject.toml uv.lock .env.example src/docintel/core src/docintel/domain tests/test_schema.py notebooks/00_explore.ipynb
-$ git commit -m "phase 1a: field schema, settings, response_format"
+git status
+git add pyproject.toml uv.lock .env.example src/docintel/core src/docintel/domain tests/test_schema.py notebooks/00_explore.ipynb
+git commit -m "phase 1a: field schema, settings, response_format"
 ```
 
 Check the `git status` output first: `.env` must not be in the list.

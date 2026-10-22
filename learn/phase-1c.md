@@ -161,7 +161,7 @@ nothing for that contract. You decide this in Step 3.
 Create the empty files:
 
 ```sh
-$ touch src/docintel/evals/runner.py tests/test_runner.py
+touch src/docintel/evals/runner.py tests/test_runner.py
 ```
 
 You should now have:
@@ -254,7 +254,7 @@ Here, we:
 Checkpoint. Close the notebook connection first: this writes to the database.
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.runner import TABLES, docs_for, cuad_txt
 from docintel.evals.store import connect
 with connect() as con:
@@ -263,6 +263,9 @@ with connect() as con:
     print(len(dev), dev[0])
     print(len(cuad_txt(con, dev[0])))
     print(con.sql('SELECT count(*) FROM runs').fetchone(), con.sql('SELECT count(*) FROM predictions').fetchone())"
+```
+
+```text
 52 2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement
 29454
 (0,) (0,)
@@ -311,7 +314,7 @@ Here, we:
 Checkpoint. Guess first: is the estimate for the 1b contract above or below its real $0.00118?
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.runner import cuad_txt, docs_for, estimate, price
 from docintel.evals.store import connect
 DOC = 'EcoScienceSolutionsInc_20171117_8-K_EX-10.1_10956472_EX-10.1_Endorsement Agreement'
@@ -320,6 +323,9 @@ print(price(M))
 with connect() as con:
     print(round(estimate([cuad_txt(con, DOC)], M, 'v1'), 5))
     print(round(estimate([cuad_txt(con, d) for d in docs_for(con, 'dev')], M, 'v1'), 3))"
+```
+
+```text
 (9e-08, 5.5e-07)
 0.00101
 0.087
@@ -399,7 +405,7 @@ Here, we:
 Checkpoint. Guess the last line first: are the rebuilt fields equal to the original?
 
 ```sh
-$ uv run python - <<'EOF'
+uv run python - <<'EOF'
 import json
 from pathlib import Path
 from docintel.core.llm import LLMResult
@@ -414,6 +420,9 @@ print(len(rows), rows[2][2:5], json.loads(rows[2][5])['value'])
 print(to_rows('1b-example', DOC, bad)[0][2:])
 print(from_rows([(row[2], row[5]) for row in rows]) == pred)
 EOF
+```
+
+```text
 12 ('governing_law', True, True) Michigan
 ('parties', False, False, '{"quotes": [], "found": false, "value": []}')
 True
@@ -479,7 +488,7 @@ Checkpoint. Store your 1b answer as a tiny run called `1b-example`, then score i
 first: how many rows does `scores` have after two calls?
 
 ```sh
-$ uv run python - <<'EOF'
+uv run python - <<'EOF'
 from pathlib import Path
 from docintel.core.llm import LLMResult
 from docintel.domain.schema.fields import ContractFields
@@ -494,6 +503,9 @@ with connect() as con:
     print(score(con, '1b-example'), score(con, '1b-example'))
     print(con.execute("SELECT sum(tp), sum(fp), sum(fn), count(*) FROM scores WHERE run_id = '1b-example'").fetchone())
 EOF
+```
+
+```text
 1 1
 (7, 2, 2, 12)
 ```
@@ -566,7 +578,10 @@ The file says "with a fake extract" already: 1c2 adds a third test that uses one
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 12%]
@@ -735,9 +750,12 @@ this test, the first bad answer in a real run would crash `score`. Change it bac
 **Break 2: a wrong model id.** Guess what `price` does with a capital `B`:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.runner import price
 price('qwen/qwen3.8-27B')"
+```
+
+```text
 ...
     p = prices[model]  # a KeyError here means the model id is wrong
         ~~~~~~^^^^^^^
@@ -770,9 +788,9 @@ three tables, why predictions and scores are separate, how a row rebuilds an ans
 Step 3 decision lives) and `test_runner.py` (each test). Then:
 
 ```sh
-$ git status
-$ git add src/docintel/evals/runner.py tests/test_runner.py notebooks/00_explore.ipynb
-$ git commit -m "phase 1c: runs, predictions and scores tables, estimate, score(run_id)"
+git status
+git add src/docintel/evals/runner.py tests/test_runner.py notebooks/00_explore.ipynb
+git commit -m "phase 1c: runs, predictions and scores tables, estimate, score(run_id)"
 ```
 
 ## Conclusion

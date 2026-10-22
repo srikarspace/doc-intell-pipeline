@@ -146,7 +146,7 @@ con.close()
 Then create the test file:
 
 ```sh
-$ touch tests/test_splits.py
+touch tests/test_splits.py
 ```
 
 You should now have:
@@ -224,12 +224,15 @@ Here, we keep the exact CUAD spelling as the value. Later code joins on `labels.
 Checkpoint. Check that all 12 names exist in `labels`:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 import duckdb
 from docintel.evals.datasets import FIELDS
 names = [f for group in FIELDS.values() for f in group]
 con = duckdb.connect('data/docintel.duckdb', read_only=True)
 print(len(names), con.execute('SELECT count(DISTINCT category) FROM labels WHERE list_contains(?, category)', [names]).fetchone())"
+```
+
+```text
 12 (12,)
 ```
 
@@ -379,11 +382,14 @@ Here, we:
 Checkpoint. Guess the three keys first:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.datasets import family
 print(family('FEDERATEDGOVERNMENTINCOMESECURITIESINC_04_28_2020-EX-99.SERV AGREE-SERVICES AGREEMENT'))
 print(family('Monsanto Company - SECOND A_R EXCLUSIVE AGENCY AND MARKETING AGREEMENT'))
 print(family('XACCT Technologies, Inc.SUPPORT AND MAINTENANCE AGREEMENT'))"
+```
+
+```text
 federatedgovernmentincomesecuritiesinc
 monsanto company
 xacct technologies, inc.support and maintenance agreement
@@ -419,13 +425,16 @@ Here, we:
 Checkpoint. Guess: how many families, and how many types after the merge?
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 import duckdb
 from docintel.evals.datasets import group_families
 con = duckdb.connect('data/docintel.duckdb', read_only=True)
 rows = con.execute('SELECT doc_id, contract_type FROM contracts ORDER BY doc_id').fetchall()
 docs, ftype = group_families(rows)
 print(len(docs), len(set(ftype.values())), len(docs['cardlyticsinc']), ftype['lejuholdingsltd'])"
+```
+
+```text
 463 25 4 Collaboration
 ```
 
@@ -448,11 +457,14 @@ placed, in this type and in total.
 Checkpoint. Guess all three answers before you run it:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.datasets import pick_side
 print(pick_side({'dev': 0, 'test': 0}, {'dev': 3, 'test': 1}, 0.5))
 print(pick_side({'dev': 1, 'test': 0}, {'dev': 0, 'test': 9}, 0.5))
 print(pick_side({'dev': 0, 'test': 0}, {'dev': 0, 'test': 0}, 0.5))"
+```
+
+```text
 test
 test
 dev
@@ -524,11 +536,20 @@ one place that records your decision.
 Checkpoint. Close the notebook connection first (Project setup). Run it twice:
 
 ```sh
-$ make data
+make data
+```
+
+```text
 uv run python -m docintel.evals.datasets
 Loaded 510 contracts, 28031 label rows
 Splits: 52 dev, 52 test
-$ make data
+```
+
+```sh
+make data
+```
+
+```text
 ...
 Splits: 52 dev, 52 test
 ```
@@ -810,7 +831,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 9 files already formatted
 ...
@@ -917,8 +941,8 @@ Explain each changed file to Claude in a few sentences (the rule in `PLAN.md`): 
 evidence), and E0. Then:
 
 ```sh
-$ git add src/docintel/evals/datasets.py tests/test_splits.py notebooks/00_explore.ipynb EXPERIMENTS.md
-$ git commit -m "phase 0d: fields, subset, dev/test split, E0"
+git add src/docintel/evals/datasets.py tests/test_splits.py notebooks/00_explore.ipynb EXPERIMENTS.md
+git commit -m "phase 0d: fields, subset, dev/test split, E0"
 ```
 
 ## Conclusion

@@ -7,7 +7,7 @@ doc links to it. Dict merge with `|` is in the 0b companion ([PY-6](./phase-0b.m
 ## PY-1. `uv add --dev`: a library for developers only
 
 ```sh
-$ uv add --dev matplotlib
+uv add --dev matplotlib
 ```
 
 1. uv finds a version of matplotlib that fits your other libraries, and installs it in `.venv`.

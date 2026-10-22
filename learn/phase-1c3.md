@@ -148,8 +148,8 @@ field?". You decide which one the groups use in Step 1.
 Install matplotlib as a dev dependency, and create the test file:
 
 ```sh
-$ uv add --dev matplotlib
-$ touch tests/test_metrics.py
+uv add --dev matplotlib
+touch tests/test_metrics.py
 ```
 
 uv prints the packages it added, `matplotlib` among them.
@@ -249,7 +249,7 @@ Here, we:
 Checkpoint. Guess the last line first: what is F1 for all fields of your 1b answer?
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.scorers import GROUPS, metrics, prf
 from docintel.evals.store import connect
 print(GROUPS['basic facts'])
@@ -257,6 +257,9 @@ print(prf(0, 0, 10))
 with connect() as con:
     for r in metrics(con, '1b-example')[-5:]:
         print(r['name'], r['tp'], r['fp'], r['fn'], round(r['f1'], 2))"
+```
+
+```text
 ['parties', 'agreement_date', 'governing_law']
 {'precision': None, 'recall': 0.0, 'f1': 0.0}
 basic facts 2 1 1 0.67
@@ -343,7 +346,10 @@ Here, we:
 Checkpoint. First on the `1b-example` run, which costs nothing:
 
 ```sh
-$ uv run python -m docintel.evals.runner report 1b-example
+uv run python -m docintel.evals.runner report 1b-example
+```
+
+```text
                                        tp   fp   fn     P     R    F1
 parties                                 0    1    1  0.00  0.00  0.00
 agreement_date                          1    0    0  1.00  1.00  1.00
@@ -369,7 +375,7 @@ The three `-` rows are true negatives only: absent in the contract, and the mode
 Now on your E1 run:
 
 ```sh
-$ uv run python -m docintel.evals.runner report <E1 run_id>
+uv run python -m docintel.evals.runner report <E1 run_id>
 ```
 
 <!-- LIVE OUTPUT: E1 report from the user's own run -->
@@ -560,7 +566,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 11%]
@@ -1067,9 +1076,9 @@ Explain each changed file to Claude in a few sentences (the rule in `PLAN.md`): 
 (each test), the notebook (the chart, one real FP and one real FN), and the E1 entry. Then:
 
 ```sh
-$ git status
-$ git add src/docintel/evals/scorers.py src/docintel/evals/runner.py tests/test_metrics.py pyproject.toml uv.lock notebooks/00_explore.ipynb EXPERIMENTS.md
-$ git commit -m "phase 1c3: per-field metrics, report command, E1 results"
+git status
+git add src/docintel/evals/scorers.py src/docintel/evals/runner.py tests/test_metrics.py pyproject.toml uv.lock notebooks/00_explore.ipynb EXPERIMENTS.md
+git commit -m "phase 1c3: per-field metrics, report command, E1 results"
 ```
 
 ## Conclusion

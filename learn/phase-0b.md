@@ -225,15 +225,15 @@ First, delete the old loader. You will type it again in the shared layout. In th
 for offline tests of the pipeline ("evals") lives in `evals/`.
 
 ```sh
-$ rm -rf src/docintel/data src/docintel/store tests/test_data_load.py
-$ git status --short    # if any of those show as staged (A), run: git reset -q
+rm -rf src/docintel/data src/docintel/store tests/test_data_load.py
+git status --short    # if any of those show as staged (A), run: git reset -q
 ```
 
 Now create the new files. They are all empty for now:
 
 ```sh
-$ mkdir -p src/docintel/evals
-$ touch src/docintel/evals/__init__.py src/docintel/evals/store.py \
+mkdir -p src/docintel/evals
+touch src/docintel/evals/__init__.py src/docintel/evals/store.py \
         src/docintel/evals/datasets.py tests/test_data_load.py
 ```
 
@@ -310,7 +310,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ uv run python -c "from docintel.evals.store import connect; print(connect(':memory:').execute('SELECT 41 + 1').fetchone())"
+uv run python -c "from docintel.evals.store import connect; print(connect(':memory:').execute('SELECT 41 + 1').fetchone())"
+```
+
+```text
 (42,)
 ```
 
@@ -362,7 +365,10 @@ this. It is a naming habit that everyone follows.
 Checkpoint. Guess the three keys first:
 
 ```sh
-$ uv run python -c "from docintel.evals.datasets import _key; print(_key('MOELIS&CO_x'), _key('MOELIS_CO_x'), _key('LECLANCHÉ S.A. - A&R AGREEMENT '))"
+uv run python -c "from docintel.evals.datasets import _key; print(_key('MOELIS&CO_x'), _key('MOELIS_CO_x'), _key('LECLANCHÉ S.A. - A&R AGREEMENT '))"
+```
+
+```text
 moeliscox moeliscox leclanchesaaragreement
 ```
 
@@ -446,7 +452,7 @@ Here, we:
 Checkpoint. Print the first contract:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 from docintel.evals.datasets import iter_contracts
 print(next(iter_contracts(Path('data/raw/CUAD_v1'))))"
@@ -504,12 +510,15 @@ changes.
 Checkpoint. Guess both numbers before you run it:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 from docintel.evals.datasets import iter_labels
 rows = list(iter_labels(Path('data/raw/CUAD_v1')))
 print(len(rows), sum(r['is_present'] for r in rows))
 print(rows[0])"
+```
+
+```text
 28031 13823
 {'doc_id': 'LIMEENERGYCO_09_09_1999-EX-10-DISTRIBUTOR AGREEMENT', 'category': 'Document Name', 'span_text': 'DISTRIBUTOR AGREEMENT', 'start_char': 44, 'end_char': 65, 'is_present': True}
 ```
@@ -584,13 +593,16 @@ it would break the query. Placeholders handle this safely.
 Checkpoint. Load into a temporary in-memory database, and ask the first real question:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 from docintel.evals.datasets import load_cuad
 from docintel.evals.store import connect
 with connect(':memory:') as con:
     print(load_cuad(con, Path('data/raw/CUAD_v1')))
     print(con.sql('SELECT category, count(*) AS n FROM labels WHERE is_present GROUP BY category ORDER BY n DESC LIMIT 3'))"
+```
+
+```text
 (510, 28031)
 ┌──────────────────┬───────┐
 │     category     │   n   │
@@ -702,7 +714,10 @@ The second line must start with a **tab**, not spaces. `make` gives an error on 
 Checkpoint. pypdf may print warnings like "Ignoring wrong pointing object". You can ignore them:
 
 ```sh
-$ make data
+make data
+```
+
+```text
 uv run python -m docintel.evals.datasets
 Loaded 510 contracts, 28031 label rows
 ```
@@ -710,7 +725,7 @@ Loaded 510 contracts, 28031 label rows
 Then check that every contract found its PDF:
 
 ```sh
-$ uv run python -c "import duckdb; print(duckdb.connect('data/docintel.duckdb', read_only=True).sql('SELECT count(*) FILTER (WHERE pdf_path IS NULL) AS null_pdf FROM contracts'))"
+uv run python -c "import duckdb; print(duckdb.connect('data/docintel.duckdb', read_only=True).sql('SELECT count(*) FILTER (WHERE pdf_path IS NULL) AS null_pdf FROM contracts'))"
 ```
 
 `null_pdf` must be 0.
@@ -1013,7 +1028,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 6 files already formatted
 ...
@@ -1077,8 +1095,8 @@ Common problems, and how to fix them:
 Explain each new file to Claude in a few sentences (the rule in `PLAN.md`). Then:
 
 ```sh
-$ git add src/docintel/evals tests/test_data_load.py Makefile
-$ git commit -m "phase 0b: data loader in evals/"
+git add src/docintel/evals tests/test_data_load.py Makefile
+git commit -m "phase 0b: data loader in evals/"
 ```
 
 ## Conclusion

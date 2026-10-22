@@ -75,7 +75,8 @@ should now have:") and again when files are added. Build each file one piece at 
 file before every block ("Put this in `path`:", "Add to the bottom of `path`:", "Update the
 imports at the top of `path`:"), then explain it right after ("Here, we..." plus a short
 numbered list when there are several moves). After every step, a checkpoint: the exact command
-with a `$` prompt and its real output, run on real data where possible. Put the complete final
+in a `sh` block with no `$` prompt (so it copies straight into the terminal), then its real
+output in a separate `text` block, run on real data where possible. Put the complete final
 version of each file that was built in pieces inside a collapsed <details> block. Always wrap
 file names in backticks (markdown eats __init__ otherwise).
 
@@ -153,7 +154,8 @@ Commands that create the files (mkdir/touch), then "You should now have:" and th
 **Why.** One sentence tied to the product.
 "Put this in `path`:" / "Add to the bottom of `path`:" / "Update the imports ..." + block.
 "Here, we..." explanation. User decision steps: options, decide, then a <details> reference.
-Checkpoint: `$ command` and its real output. Make sure it matches before moving on.
+Checkpoint: command in a `sh` block (no `$`), real output in a `text` block. Make sure it
+matches before moving on.
 
 ## Step 2 ... Step N
 The last step is the small test file for this part's invariants. Then "Your project structure

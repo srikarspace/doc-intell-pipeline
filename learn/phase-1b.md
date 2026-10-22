@@ -182,10 +182,10 @@ This is the interesting round. The model found the right parties, but it broke t
 Create the folders and empty files:
 
 ```sh
-$ mkdir -p src/docintel/domain/extract/prompts/v1
-$ touch src/docintel/domain/extract/__init__.py src/docintel/domain/extract/extract.py
-$ touch src/docintel/domain/extract/prompts/v1/system.md src/docintel/domain/extract/prompts/v1/user.md
-$ touch tests/test_extract.py
+mkdir -p src/docintel/domain/extract/prompts/v1
+touch src/docintel/domain/extract/__init__.py src/docintel/domain/extract/extract.py
+touch src/docintel/domain/extract/prompts/v1/system.md src/docintel/domain/extract/prompts/v1/user.md
+touch tests/test_extract.py
 ```
 
 You should now have:
@@ -264,7 +264,10 @@ Then write `src/docintel/domain/extract/prompts/v1/system.md` with your rules. W
 Checkpoint. Check the files exist and are not empty:
 
 ```sh
-$ wc -c src/docintel/domain/extract/prompts/v1/*.md
+wc -c src/docintel/domain/extract/prompts/v1/*.md
+```
+
+```text
     2287 src/docintel/domain/extract/prompts/v1/system.md
       76 src/docintel/domain/extract/prompts/v1/user.md
     2363 total
@@ -402,7 +405,7 @@ exact string `{contract}`.
 Checkpoint. Build the messages for the example contract. Guess the second line first:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 import duckdb
 from docintel.domain.extract.extract import build_messages
@@ -414,6 +417,9 @@ messages = build_messages(text)
 print([m['role'] for m in messages], len(text), len(messages[1]['content']))
 print(text in messages[1]['content'])
 print(sum(len(m['content']) for m in messages) // 4)"
+```
+
+```text
 ['system', 'user'] 18104 18170
 True
 5114
@@ -459,10 +465,13 @@ the runner, the API and later an agent can all call.
 Checkpoint:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 import inspect
 from docintel.domain.extract.extract import extract
 print(inspect.signature(extract))"
+```
+
+```text
 (text: str, model: str | None = None, *, prompt_version: str = 'v1', con: _duckdb.DuckDBPyConnection | None = None, run_id: str | None = None) -> docintel.core.llm.LLMResult[docintel.domain.schema.fields.ContractFields]
 ```
 
@@ -473,7 +482,7 @@ print(inspect.signature(extract))"
 Close the notebook connection first: this writes to `llm_calls`. Then run:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 from docintel.domain.extract.extract import extract
 from docintel.evals.store import connect
@@ -567,12 +576,15 @@ And the model's answer for the same three fields. Run this in the terminal. It r
 file, so there is no API call:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from pathlib import Path
 from docintel.domain.schema.fields import ContractFields
 pred = ContractFields.model_validate_json(Path('data/examples/ecoscience_v1.json').read_text(encoding='utf-8'))
 for name in ['governing_law', 'change_of_control', 'parties']:
     print(name, getattr(pred, name).model_dump_json())"
+```
+
+```text
 governing_law {"quotes":["this Agreement, all amendments hereto, ... the State of Michigan."],"value":"Michigan","found":true}
 change_of_control {"quotes":[],"found":false}
 parties {"quotes":["THIS ENDORSEMENT AGREEMENT (the \"Agreement\") is dated as of ... an individual."],"value":["Eco Science Solutions, Inc. (\"ESSI\")","Stephen Marley (\"Talent\")"],"found":true}
@@ -639,7 +651,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 19%]
@@ -794,9 +809,9 @@ Explain each changed file to Claude in a few sentences (the rule in `PLAN.md`): 
 comparison. Then:
 
 ```sh
-$ git status
-$ git add src/docintel/domain/extract tests/test_extract.py notebooks/00_explore.ipynb
-$ git commit -m "phase 1b: prompt v1 and extract()"
+git status
+git add src/docintel/domain/extract tests/test_extract.py notebooks/00_explore.ipynb
+git commit -m "phase 1b: prompt v1 and extract()"
 ```
 
 ## Conclusion

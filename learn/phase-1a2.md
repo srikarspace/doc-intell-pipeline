@@ -147,7 +147,7 @@ The real number is 3. That is why we set `max_retries=0` and do the retries ours
 Create the test file:
 
 ```sh
-$ touch tests/test_llm.py
+touch tests/test_llm.py
 ```
 
 You should now have:
@@ -213,10 +213,13 @@ Some imports are not used yet. The next steps use them.
 Checkpoint:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.llm import make_client
 c = make_client()
 print(c.base_url, c.max_retries, c.timeout)"
+```
+
+```text
 https://openrouter.ai/api/v1/ 0 120.0
 ```
 
@@ -262,12 +265,15 @@ Here, we:
 Checkpoint. Guess which of the three fail, and why:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.llm import _parse
 from docintel.domain.schema.fields import Clause
 print(_parse(Clause, '{\"quotes\": [\"shall not compete\"], \"found\": true}'))
 print(_parse(Clause, '{\"quotes\": [], \"found\": \"yes\"}')[1])
 print(_parse(Clause, '{\"quotes\": []}')[1])"
+```
+
+```text
 (Clause(quotes=['shall not compete'], found=True), None)
 1 validation error for Clause
 found
@@ -327,10 +333,13 @@ Here, we:
 Checkpoint. Guess the three answers:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 import openai
 from docintel.core.llm import RETRYABLE
 print(issubclass(openai.APITimeoutError, RETRYABLE), issubclass(openai.RateLimitError, RETRYABLE), issubclass(openai.BadRequestError, RETRYABLE))"
+```
+
+```text
 True True False
 ```
 
@@ -391,7 +400,7 @@ Here, we:
 Checkpoint. Log a hand-made result twice into a throwaway database:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.llm import LLMResult, log_call
 from docintel.evals.store import connect
 r = LLMResult('{}', None, 'bad', {'prompt_tokens': 10, 'completion_tokens': 2}, 0.00001, 850, 'qwen/x', 'DeepInfra', 1)
@@ -399,6 +408,9 @@ with connect(':memory:') as con:
     log_call(con, r, 'Clause')
     log_call(con, r, 'Clause')
     print(con.sql('SELECT schema_name, ok, error, prompt_tokens, cost_usd, latency_ms FROM llm_calls'))"
+```
+
+```text
 ┌─────────────┬─────────┬─────────┬───────────────┬──────────┬────────────┐
 │ schema_name │   ok    │  error  │ prompt_tokens │ cost_usd │ latency_ms │
 │   varchar   │ boolean │ varchar │     int32     │  double  │   int32    │
@@ -487,7 +499,7 @@ model, not a full contract. Use your own model name if it is not `Text`. It writ
 Checkpoint:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.core.llm import call_llm
 from docintel.domain.schema.fields import Text
 from docintel.evals.store import connect
@@ -670,7 +682,10 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 22%]
@@ -1022,9 +1037,9 @@ function, and what happens on bad JSON, a 429 and a 400) and `test_llm.py` (each
 the fake server works). Then:
 
 ```sh
-$ git status
-$ git add src/docintel/core/llm.py tests/test_llm.py
-$ git commit -m "phase 1a2: OpenRouter client with retries and llm_calls log"
+git status
+git add src/docintel/core/llm.py tests/test_llm.py
+git commit -m "phase 1a2: OpenRouter client with retries and llm_calls log"
 ```
 
 ## Conclusion

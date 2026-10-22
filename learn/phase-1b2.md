@@ -146,7 +146,7 @@ not "percent correct". TNs make a lazy model look good.
 Create the empty files:
 
 ```sh
-$ touch src/docintel/evals/scorers.py tests/test_scorers.py
+touch src/docintel/evals/scorers.py tests/test_scorers.py
 ```
 
 You should now have:
@@ -252,7 +252,10 @@ def main() -> None:
 Checkpoint. Close the notebook connection, then:
 
 ```sh
-$ make data
+make data
+```
+
+```text
 uv run python -m docintel.evals.datasets
 Loaded 510 contracts, 28031 label rows, 19700 answers
 Splits: 52 dev, 52 test
@@ -351,11 +354,14 @@ Here, we:
 Checkpoint:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.scorers import tokens, jaccard
 print(sorted(tokens('ESSI shall have the right to use the name, image, likeness')))
 gold = 'This Agreement shall be governed by the laws of the State of Michigan.'
 print(round(jaccard('governed by the laws of the State of Michigan', gold), 2), round(jaccard('Michigan', gold), 2))"
+```
+
+```text
 ['essi', 'have', 'image', 'likeness', 'name', 'right', 'shall', 'the', 'to', 'use']
 0.64 0.09
 ```
@@ -417,10 +423,13 @@ Here, we:
 Checkpoint. Guess each line first:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.scorers import norm_date, norm_law, value_ok
 for d in ['11/14/17', '2017-11-14', '[]/[]/2020', '09/[]/2019', '[]/[]/[]', '2020']: print(repr(d), '->', repr(norm_date(d)))
 print(norm_law('the State of Michigan'), '|', norm_law('Illinois; New York'), '|', value_ok('governing_law', 'New York', 'Illinois; New York'))"
+```
+
+```text
 '11/14/17' -> '2017-11-14'
 '2017-11-14' -> '2017-11-14'
 '[]/[]/2020' -> '2020'
@@ -491,9 +500,12 @@ Here, we:
 Checkpoint. Guess the five tuples first:
 
 ```sh
-$ uv run python -c "
+uv run python -c "
 from docintel.evals.scorers import outcome
 print([outcome(*c) for c in [(False, False, True), (False, True, True), (True, False, True), (True, True, True), (True, True, False)]])"
+```
+
+```text
 [(0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), (0, 1, 1)]
 ```
 
@@ -574,7 +586,7 @@ answers.
 Checkpoint. Score the answer you saved in 1b:
 
 ```sh
-$ uv run python - <<'EOF'
+uv run python - <<'EOF'
 import duckdb
 from docintel.domain.schema.fields import ContractFields
 from docintel.evals.scorers import score_doc
@@ -701,7 +713,10 @@ The fake tables have only the columns `score_doc` reads. No CUAD files, no key.
 Checkpoint:
 
 ```sh
-$ make lint && make test
+make lint && make test
+```
+
+```text
 All checks passed!
 ...
 tests/test_data_load.py ....                                             [ 13%]
@@ -920,9 +935,9 @@ Explain each changed file to Claude in a few sentences (the rule in `PLAN.md`): 
 Then:
 
 ```sh
-$ git status
-$ git add src/docintel/evals/datasets.py src/docintel/evals/scorers.py tests/test_scorers.py notebooks/00_explore.ipynb
-$ git commit -m "phase 1b2: scoring rules, answers table, scorers.py"
+git status
+git add src/docintel/evals/datasets.py src/docintel/evals/scorers.py tests/test_scorers.py notebooks/00_explore.ipynb
+git commit -m "phase 1b2: scoring rules, answers table, scorers.py"
 ```
 
 ## Conclusion
