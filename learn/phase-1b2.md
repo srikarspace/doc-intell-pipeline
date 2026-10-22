@@ -574,7 +574,7 @@ answers.
 Checkpoint. Score the answer you saved in 1b:
 
 ```sh
-$ uv run python -c "
+$ uv run python - <<'EOF'
 import duckdb
 from docintel.domain.schema.fields import ContractFields
 from docintel.evals.scorers import score_doc
@@ -583,9 +583,14 @@ pred = ContractFields.model_validate_json(open('data/examples/ecoscience_v1.json
 con = duckdb.connect('data/docintel.duckdb', read_only=True)
 rows = score_doc(con, DOC, pred)
 for r in rows:
-    print(f\"{r['field']:36} {r['rule']:8} {r['gold_present']!s:5} {r['found']!s:5} {r['quote_ok']!s:5} {r['value_ok']!s:5} {r['tp']} {r['fp']} {r['fn']}\")
-print({k: sum(r[k] for r in rows) for k in ('tp', 'fp', 'fn')})"
+    print(f"{r['field']:36} {r['rule']:8} {r['gold_present']!s:5} {r['found']!s:5} {r['quote_ok']!s:5} {r['value_ok']!s:5} {r['tp']} {r['fp']} {r['fn']}")
+print({k: sum(r[k] for r in rows) for k in ('tp', 'fp', 'fn')})
+EOF
 ```
+
+This one uses a heredoc (`<<'EOF' ... EOF`), not `-c "..."`. Inside `"..."`, zsh reads `!s` as a
+history command and stops with `no such word in event`. The quotes around `'EOF'` tell zsh to
+leave the text alone.
 
 <!-- LIVE OUTPUT: score table from the user's saved 1b answer -->
 

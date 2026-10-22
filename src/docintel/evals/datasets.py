@@ -236,12 +236,42 @@ def make_splits(
     return counts
 
 
+def read_answers(cuad_dir: Path) -> dict[str, dict[str, str]]:
+    """key -> {category: answer} from the "-Answer" columns of master_clauses.csv."""
+    out = {}
+    with (cuad_dir / "master_clauses.csv").open(newline="", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            answers = {}
+            for col, val in r.items():
+                category, _, tail = col.rpartition("-")
+                if tail.strip() == "Answer" and val.strip():  # one column is "...- Answer"
+                    answers[category.strip()] = val.strip()
+            out[_key(Path(r["Filename"]).stem)] = answers
+    return out
+
+
+def load_answers(con: duckdb.DuckDBPyConnection, cuad_dir: Path) -> int:
+    """(Re)create `answers`: CUAD's short answer per (contract, category). Returns the row count."""
+    table = read_answers(cuad_dir)
+    rows = [
+        (doc["title"], category, answer)
+        for doc in read_docs(cuad_dir)
+        for category, answer in (_lookup(table, doc["title"]) or {}).items()
+    ]
+    con.execute(
+        "CREATE OR REPLACE TABLE answers (doc_id VARCHAR, category VARCHAR, answer VARCHAR)"
+    )
+    con.executemany("INSERT INTO answers VALUES (?, ?, ?)", rows)
+    return len(rows)
+
+
 def main() -> None:
     cuad_dir = download_cuad()
     with connect() as con:
         n_contracts, n_labels = load_cuad(con, cuad_dir)
         counts = make_splits(con)
-    print(f"Loaded {n_contracts} contracts, {n_labels} label rows")
+        n_answers = load_answers(con, cuad_dir)
+    print(f"Loaded {n_contracts} contracts, {n_labels} label rows, {n_answers} answers")
     print(f"Splits: {counts['dev']} dev, {counts['test']} test")
 
 

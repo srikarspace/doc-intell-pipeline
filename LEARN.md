@@ -1,6 +1,6 @@
 # Doc Intel Pipeline
 
-We are building a doc intel pipeline. It looks at the pdf docs and returns the data needed in structured form. For this we extract/parse the data from the pdf and share it to a modal. Here we compare different parsers and different types of modals and see how the pipeline is performing. At the end we compare the quality and deduce which options are better what to choose and why. The good thing about this is that we have verification data already provided. So we can compare the accuracy of the response as well and add Evals as needed.
+We are building a doc intel pipeline. It looks at the pdf docs and returns the data needed in structured form. For this we extract/parse the data from the pdf and share it to a model. Here we compare different parsers and different types of models and see how the pipeline is performing. At the end we compare the quality and deduce which options are better what to choose and why. The good thing about this is that we have verification data already provided. So we can compare the accuracy of the response as well and add Evals as needed.
 
 ## We are planning to build this pipeline in phases.
 
@@ -26,15 +26,15 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Why the exam must stay fixed. You change the prompt, run again, and the grade goes from 60% to 80%. Same exam, so the prompt change caused the jump.
 
 #### Context window
-- Context length check is important because based on it we can decide what modal we need to choose and if the input context is too big we can chunk the context. Apart from that we can estimate the cost as well. We use char length / 4 as tokens size of the file.
+- Context length check is important because based on it we can decide what model we need to choose and if the input context is too big we can chunk the context. Apart from that we can estimate the cost as well. We use char length / 4 as tokens size of the file.
 
-### Phase 1: Create schema, LLM Client, extract, score in evals
+### Phase 1: Create schema, LLM Client, Extract, Score in Evals
 
 #### 1a: Create a schema, LLM Client
 - We use pydantic to create a schema.
 - Its a Class which is used as both template and validation. We send it to the LLM to return response in a structured response. We also validate with the same Class. One file does two things.
 - Three configs to consider when creating a schema and sending to LLM.
-    - `extra="forbid"`: no extra props should be returned by the modal. Ex: expected `{"name":"sam"}` returned `{"name":"sam", "age": 20}`. This is a warning. It should match expectation.
+    - `extra="forbid"`: no extra props should be returned by the model. Ex: expected `{"name":"sam"}` returned `{"name":"sam", "age": 20}`. This is a warning. It should match expectation.
     - `strict=True`: The expected response should always be returned. Ex: expected `{"is_present": True}` returned `{"is_present": "yes"}`. This is a warning. It should match expectation. If    `strict=False` then Class would convert it `yes` to `True`
     - `required fields`: We have to pass the list of required fields so that LLM knows what not to miss.
         - If three are not satisfied then a warning/error is thrown.
@@ -73,6 +73,39 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - User Prompt: Where we pass the content of the doc.
 - We load the prompt, build the message with prompt and contract and send the request to the llm with the message
 - Once we get the response we extract the data and persist to logs
+
+##### Scoring in Evals
+- Without evals we have answers and gold labels but we don't know if its right. With evals we will see if the the answer is right.
+
+    ||Model: found|Model: not found|
+    |---|---|---|
+    |Field: is there|TP(correct)|FN(missed it)|
+    |Field: not there|FP(made it up)|TN(correct silently)|
+
+        - True/False: was the model right
+        - Positive/Negative: did the model say found?
+
+- Precision = `TP / (TP + FP)` = When the model says found how many times its correct
+- Recall = `TP / (TP + FN)` = Out of all the things that is there, how much did it find
+
+- We have to `normalize` data. Ex: Change similar texts to same format. `11/14/17`, `2017-11-14` and `2017/11/14` to `2017-11-14`.  Why? The lawyer wrote `11/14/17` and the modal returned `2017-11-14`. A plane `==` is wrong but normalizing first says correct. 
+- Having a `Threshold` value is important. What is Threshold? The lowest score that still counts as match. Why? For the quotes the model copies a little more or little less text. An overlap score with a threshold says close enough. Measuring `Jaccard` for two texts can help with calculating threshold. Ex: `"the State of Michigan"` and `"laws of Michigan"` share 2 of 5 words, so `0.4`. We can set a threshold value of `0.4`.
+- More questions:
+    - What if even after normalizing some data is missing? goal label `2017` but modal returns `2017-11-14` is this right or wrong. We need to decide what to do to the score as year is still correct.
+    - What if model returned only `Michigan` but the goal label is `This Agreement shall be governed by the laws of the State of Michigan.`. Jaccard score is `0.09` right which will be too low that threshold `0.5` then how do we score as the answer is still correct.
+
+- To answer edge cases like above
+    - Lets say gold label has no answer but model returned a value. Now we can't compare it right? now we compare quotes in this case.
+
+1. Create gold values and qoutes to compare
+2. Then add matching rules for the models answers and the gold values
+3. The outcome table. In order to score for each field we need to compare either answers and gold values or quotes as sometimes values can be missing.
+
+
+## Notes to remember
+- If notebook locked your db
+    - check `lsof data/docintel.duckdb`. Returns the PID where there is a connection.
+    - then `kill {PID}`
 
 
 
