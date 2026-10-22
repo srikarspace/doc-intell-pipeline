@@ -97,9 +97,37 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - To answer edge cases like above
     - Lets say gold label has no answer but model returned a value. Now we can't compare it right? now we compare quotes in this case.
 
-1. Create gold values and qoutes to compare
-2. Then add matching rules for the models answers and the gold values
-3. The outcome table. In order to score for each field we need to compare either answers and gold values or quotes as sometimes values can be missing.
+- Scoring
+    - We save the answers and score as many times as we want. Because Answers cost money but scoring is free.
+    - We can change the scoring rule and score as many times as we want.
+    - `predictions` are long. One row per contract and label. Every row keeps the fields whole answer in JSON.
+    - `ok` and `found` are also plain columns. Helps calculate TP, FP and FN.
+    - Predict and then score.
+
+- Predictions
+    - We need to save the runs data, like `run_id`, prompt version, cost etc. To answer product or business when needed.
+    - A `runs` table one row per `run`.
+    - Primary key on each run is contract and field.
+    - Lets say the response JSON is broken then we ignore the whole run. Because if we consider it would be a FN and as a result it would get down the Recall. This makes the model in a good place. We would fix the JSON issue separately. 
+
+- Estimates
+    - We should know the cost before we spend. We estimate the cost before making the LLM call. So that we know what would be the actual cost in production.
+    - The estimate counts characters not tokens.
+    - Sometimes the estimated cost can be cheaper than actual cost. This can be because the distribution used a different provider. For this before running all the contracts we check with few and then we understand how to estimate.
+
+- Scoring Setup:
+    1. Create gold values and quotes to compare if not present yet.
+    2. Then add matching rules for the models answers and the gold values.
+    3. Setup `outcome` table. In order to score for each field we need to compare either answers and gold values or quotes as sometimes values can be missing.
+    4. Scoring starts.
+    5. Setup tables for `runs`, `scores`(PK: run_id, doc_id, field) and `predictions`(PK: run_id, doc_id, field).
+    6. Estimate the cost to answer "What is the run cost before we spend it".
+    7. 
+
+
+    
+
+
 
 
 ## Notes to remember
