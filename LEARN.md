@@ -91,7 +91,7 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - We have to `normalize` data. Ex: Change similar texts to same format. `11/14/17`, `2017-11-14` and `2017/11/14` to `2017-11-14`.  Why? The lawyer wrote `11/14/17` and the modal returned `2017-11-14`. A plane `==` is wrong but normalizing first says correct. 
 - Having a `Threshold` value is important. What is Threshold? The lowest score that still counts as match. Why? For the quotes the model copies a little more or little less text. An overlap score with a threshold says close enough. Measuring `Jaccard` for two texts can help with calculating threshold. Ex: `"the State of Michigan"` and `"laws of Michigan"` share 2 of 5 words, so `0.4`. We can set a threshold value of `0.4`.
 - More questions:
-    - What if even after normalizing some data is missing? goal label `2017` but modal returns `2017-11-14` is this right or wrong. We need to decide what to do to the score as year is still correct.
+    - What if even after normalizing some data is missing? gold label `2017` but modal returns `2017-11-14` is this right or wrong. We need to decide what to do to the score as year is still correct.
     - What if model returned only `Michigan` but the goal label is `This Agreement shall be governed by the laws of the State of Michigan.`. Jaccard score is `0.09` right which will be too low that threshold `0.5` then how do we score as the answer is still correct.
 
 - To answer edge cases like above
@@ -122,13 +122,16 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     4. Scoring starts.
     5. Setup tables for `runs`, `scores`(PK: run_id, doc_id, field) and `predictions`(PK: run_id, doc_id, field).
     6. Estimate the cost to answer "What is the run cost before we spend it".
-    7. 
+    7. With above setup as we have `runs` stored. We can change the scoring formula when we want to get a new score.
 
-
-    
-
-
-
+##### Runs
+    - Call are slow:
+        - we are parallel runs for a set of contract at once
+        - Doing one at a time will take much longer so we are doing a parallel run.
+    - Runs stop:
+        - But if network fails for one of the contracts. If we rerun we would pay for all the parallel again.
+        - So we keep a resume option so that we can pay for the failed ones.
+    - One bad contract should not stop all the other runs
 
 ## Notes to remember
 - If notebook locked your db

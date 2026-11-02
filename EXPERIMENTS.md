@@ -24,3 +24,16 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
 - **Presence rates per field:**
 - **Dev/test split rule + sizes:**
 - **Known limitations of the data:**
+
+## E1: baseline extraction on clean text
+- **Date:**
+- **run_id(s):** 20261101-192153 (pilot: <pilot run_id>)
+- **Question / hypothesis:** How well does Qwen3-235B with prompt v1 find the 12 fields on clean
+  CUAD text? Which fields are weak?
+- **Data:** dev, 52 contracts, 12 fields, CUAD .txt (clean)
+- **Setup:** qwen/qwen3-235b-a22b-2507, parser cuad_txt, prompt v1, temperature 0, no validation
+  retries. Bad answers scored as: <your 1c Step 3 decision>
+- **Results:** cost 0.09 (estimate 0.086), p50 63.1, p95 106.3, bad answers 0. P/R per field
+  and per group: see 1c3.
+- **Conclusion:** (1c3)
+- **Next step:** (1c3)
