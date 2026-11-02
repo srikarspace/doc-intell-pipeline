@@ -874,10 +874,13 @@ RUN = "20261021-HHMMSS"
 con.sql("""
 SELECT
     (SELECT count(*) FROM predictions WHERE run_id = $run) AS prediction_rows,
-    (SELECT count(DISTINCT doc_id) FILTER (WHERE NOT ok) FROM predictions WHERE run_id = $run) AS bad_answers,
+    (SELECT count(DISTINCT doc_id) FILTER (WHERE NOT ok)
+     FROM predictions WHERE run_id = $run) AS bad_answers,
     (SELECT round(sum(cost_usd), 4) FROM llm_calls WHERE run_id = $run) AS cost_usd,
-    (SELECT round(quantile_cont(latency_ms, 0.5) / 1000, 1) FROM llm_calls WHERE run_id = $run) AS p50_s,
-    (SELECT round(quantile_cont(latency_ms, 0.95) / 1000, 1) FROM llm_calls WHERE run_id = $run) AS p95_s,
+    (SELECT round(quantile_cont(latency_ms, 0.5) / 1000, 1)
+     FROM llm_calls WHERE run_id = $run) AS p50_s,
+    (SELECT round(quantile_cont(latency_ms, 0.95) / 1000, 1)
+     FROM llm_calls WHERE run_id = $run) AS p95_s,
     (SELECT sum(tp) FROM scores WHERE run_id = $run) AS tp,
     (SELECT sum(fp) FROM scores WHERE run_id = $run) AS fp,
     (SELECT sum(fn) FROM scores WHERE run_id = $run) AS fn

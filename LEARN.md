@@ -74,7 +74,7 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - We load the prompt, build the message with prompt and contract and send the request to the llm with the message
 - Once we get the response we extract the data and persist to logs
 
-##### Scoring in Evals
+#### 1c: Scoring in Evals, experiments
 - Without evals we have answers and gold labels but we don't know if its right. With evals we will see if the the answer is right.
 
     ||Model: found|Model: not found|
@@ -124,7 +124,7 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     6. Estimate the cost to answer "What is the run cost before we spend it".
     7. With above setup as we have `runs` stored. We can change the scoring formula when we want to get a new score.
 
-##### Runs
+- Runs
     - Call are slow:
         - we are parallel runs for a set of contract at once
         - Doing one at a time will take much longer so we are doing a parallel run.
@@ -132,6 +132,11 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
         - But if network fails for one of the contracts. If we rerun we would pay for all the parallel again.
         - So we keep a resume option so that we can pay for the failed ones.
     - One bad contract should not stop all the other runs
+
+- Experiment 
+    - We run an experiment and measure metrics so that we can compare with other experiments
+    - Then get F1, TP, FP, FN calculate precision, recall
+    - Create a graph for the labels and compare with all the labels
 
 ## Notes to remember
 - If notebook locked your db

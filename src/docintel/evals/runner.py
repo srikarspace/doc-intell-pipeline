@@ -15,7 +15,7 @@ from docintel.core.config import get_settings
 from docintel.core.llm import LLMResult, log_call
 from docintel.domain.extract.extract import build_messages, extract
 from docintel.domain.schema.fields import ContractFields, Names
-from docintel.evals.scorers import score_doc
+from docintel.evals.scorers import metrics, score_doc
 from docintel.evals.store import connect
 
 TABLES = """
@@ -165,6 +165,28 @@ def run_docs(
     return failed
 
 
+COST = """
+SELECT count(*), sum(cost_usd), quantile_cont(latency_ms, 0.5) / 1000,
+    quantile_cont(latency_ms, 0.95) / 1000, count(*) FILTER (WHERE NOT ok)
+FROM llm_calls WHERE run_id = ?
+"""
+
+
+def fmt(x: float | None) -> str:
+    return "-" if x is None else f"{x:.2f}"
+
+
+def report(con: duckdb.DuckDBPyConnection, run_id: str) -> None:
+    """Print P/R/F1 per field, per group and for all fields, then cost and latency."""
+    print(f"{'':36} {'tp':>4} {'fp':>4} {'fn':>4} {'P':>5} {'R':>5} {'F1':>5}")
+    for r in metrics(con, run_id):
+        scores = f"{fmt(r['precision']):>5} {fmt(r['recall']):>5} {fmt(r['f1']):>5}"
+        print(f"{r['name']:36} {r['tp']:4} {r['fp']:4} {r['fn']:4} {scores}")
+    calls, cost, p50, p95, bad = con.execute(COST, [run_id]).fetchone()
+    if calls:  # the 1b-example run has scores but no logged calls
+        print(f"{calls} calls, ${cost:.4f}, p50 {p50:.1f} s, p95 {p95:.1f} s, {bad} bad answers")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="python -m docintel.evals.runner")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -179,6 +201,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     run.add_argument("--yes", action="store_true", help="do not ask before spending money")
     rescore = sub.add_parser("score", help="score a stored run again (no LLM calls)")
     rescore.add_argument("run_id")
+    show = sub.add_parser("report", help="print P/R per field and group, cost and latency")
+    show.add_argument("run_id")
     return parser.parse_args(argv)
 
 
@@ -188,6 +212,9 @@ def main(argv: list[str] | None = None) -> None:
         con.execute(TABLES)
         if args.command == "score":
             print(f"scored {score(con, args.run_id)} docs for run {args.run_id}")
+            return
+        if args.command == "report":
+            report(con, args.run_id)
             return
         if args.resume:
             run_id = args.resume

@@ -5,6 +5,7 @@ import re
 import duckdb
 
 from docintel.domain.schema.fields import CUAD_CATEGORY, ContractFields
+from docintel.evals.datasets import FIELDS
 
 THRESHOLD = 0.5  # token Jaccard needed for a quote to match a gold span (the CUAD paper uses 0.5)
 
@@ -122,4 +123,35 @@ def score_doc(con: duckdb.DuckDBPyConnection, doc_id: str, pred: ContractFields)
                 "fn": fn,
             }
         )
+    return rows
+
+
+GROUPS = {  # group -> its fields, from the 0d groups in datasets.FIELDS
+    group: [field for field, category in CUAD_CATEGORY.items() if category in categories]
+    for group, categories in FIELDS.items()
+}
+
+
+def prf(tp: int, fp: int, fn: int) -> dict:
+    """Precision, recall and F1. None when there is nothing to divide by."""
+    return {
+        "precision": tp / (tp + fp) if tp + fp else None,
+        "recall": tp / (tp + fn) if tp + fn else None,
+        "f1": 2 * tp / (2 * tp + fp + fn) if tp + fp + fn else None,
+    }
+
+
+PER_FIELD = "SELECT field, sum(tp), sum(fp), sum(fn) FROM scores WHERE run_id = ? GROUP BY field"
+
+
+def metrics(con: duckdb.DuckDBPyConnection, run_id: str) -> list[dict]:
+    """P/R/F1 for each field, each group, and all fields. A group adds up its fields' counts."""
+    counts = {f: (tp, fp, fn) for f, tp, fp, fn in con.execute(PER_FIELD, [run_id]).fetchall()}
+    sets = {field: [field] for field in CUAD_CATEGORY} | GROUPS | {"all": list(CUAD_CATEGORY)}
+    rows = []
+    for name, fields in sets.items():
+        tp = sum(counts[f][0] for f in fields)
+        fp = sum(counts[f][1] for f in fields)
+        fn = sum(counts[f][2] for f in fields)
+        rows.append({"name": name, "tp": tp, "fp": fp, "fn": fn, **prf(tp, fp, fn)})
     return rows

@@ -263,15 +263,15 @@ day. Parts were merged to fit; the router is cut (README future work).
 |---|---|---|---|---|
 | 1 | 0a | setup | uv project, deps, Makefile, ruff, pytest (read and run) | done |
 | 1 | 0b | data loader | CUAD download, `contracts` + `labels` tables, invariant test | done |
-| 1 | 0c | explore | notebook `00_explore.ipynb`: 6 questions, 6 findings (no `src/` code) | doc ready |
-| 1 | 0d | fields, subset, split | choose 12 fields + doc subset + split rules, `make_splits`, test, E0 | doc ready |
-| 1 | 1a | schema | Pydantic field models (strict), settings, `response_format`, schema test | doc ready |
-| 1 | 1a2 | LLM client | OpenRouter client: retries (network/429), `llm_calls` log, live call, fake-server test | doc ready |
-| 1 | 1b | prompt + extract | prompt v1 (versioned files), `extract()`, live run on one dev contract, prompt test | doc ready |
-| 1 | 1b2 | scoring rules | `answers` table, match rules, TP/FP/FN outcome table, `evals/scorers.py`, scorer test | doc ready |
-| 2 | 1c | store + score a run | `runs`/`predictions`/`scores` tables, cost estimate, bad-answer rule, `score(run_id)`, row test | doc ready |
-| 2 | 1c2 | batch run | threads, resume, CLI, pilot, resume test, E1 run | doc ready |
-| 2 | 1c3 | E1 results | P/R/F1 per field + group (micro/macro decision), `report`, chart, real misses, metrics test | doc ready |
+| 1 | 0c | explore | notebook `00_explore.ipynb`: 6 questions, 6 findings (no `src/` code) | done |
+| 1 | 0d | fields, subset, split | choose 12 fields + doc subset + split rules, `make_splits`, test, E0 | done |
+| 1 | 1a | schema | Pydantic field models (strict), settings, `response_format`, schema test | done |
+| 1 | 1a2 | LLM client | OpenRouter client: retries (network/429), `llm_calls` log, live call, fake-server test | done |
+| 1 | 1b | prompt + extract | prompt v1 (versioned files), `extract()`, live run on one dev contract, prompt test | done |
+| 1 | 1b2 | scoring rules | `answers` table, match rules, TP/FP/FN outcome table, `evals/scorers.py`, scorer test | done |
+| 2 | 1c | store + score a run | `runs`/`predictions`/`scores` tables, cost estimate, bad-answer rule, `score(run_id)`, row test | done |
+| 2 | 1c2 | batch run | threads, resume, CLI, pilot, resume test, E1 run | done |
+| 2 | 1c3 | E1 results | P/R/F1 per field + group (micro/macro decision), `report`, chart, real misses, metrics test | done |
 | 2 | 1c4 | model comparison | open-weights check, pilots, E1.1 table, model decision (no new code) | doc ready |
 | 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | planned |
 | 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
