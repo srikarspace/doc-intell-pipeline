@@ -138,6 +138,8 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Then get F1, TP, FP, FN calculate precision, recall
     - Create a graph for the labels and compare with all the labels
 
+
+
 ## Notes to remember
 - If notebook locked your db
     - check `lsof data/docintel.duckdb`. Returns the PID where there is a connection.

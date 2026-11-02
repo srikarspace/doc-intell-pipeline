@@ -37,7 +37,15 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   a gold answer counts as a miss (FN).
 - **Results:** 52 calls, 0 failed, 0 bad answers, 624 prediction rows. Cost $0.090 (estimate
   $0.087). Tokens: 555,804 in, 40,208 out (about 770 out per doc; the estimate used 1000).
-  Latency p50 63.1 s, p95 106.3 s. Totals: TP 238, FP 124, FN 75. P/R per field and per
-  group: see 1c3.
-- **Conclusion:** (1c3)
-- **Next step:** (1c3)
+  Latency p50 63.1 s, p95 106.3 s. Totals: TP 238, FP 124, FN 75.
+  All (micro): P 0.66, R 0.76, F1 0.71. Group F1: basic facts 0.63, yes/no + quote 0.85,
+  numbers/terms 0.65, license/IP 0.80. Full per-field table: `report 20261101-192153`.
+- **Conclusion:** Strongest: license_grant (F1 1.00) and anti_assignment (0.99). Weakest:
+  parties (0.38) and notice_period_to_terminate_renewal (0.45).
+  - parties: scoring, not the model. All 32 misses have the right names, but the quote is the
+    whole opening sentence and the gold spans are just the names, so Jaccard stays under the
+    threshold.
+  - notice_period_to_terminate_renewal: the model. 14 of 15 FPs are in contracts with no gold
+    answer: it quotes the notice to end the whole agreement ("terminated at any time ... upon 60
+    days' written notice"), not the notice to stop a renewal.
+- **Next step:** E1.1 (other open-weight models, 1c4), then 2a (validators and citations).
