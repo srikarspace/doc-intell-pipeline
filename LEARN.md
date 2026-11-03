@@ -138,13 +138,14 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Then get F1, TP, FP, FN calculate precision, recall
     - Create a graph for the labels and compare with all the labels
 
-
+- Models:
+    - We need to test different models with a same experiment(data, prompt, score formula)
+    - When selecting a modal we need to check license. For business most models with Apache or MIT are fine to use.
+    - Reasoning models can add additional tokens for reasoning and that may be considered as output tokens and our overall cost can be higher.
+    - We need to choose when after comparing F1, cost and bad answers
 
 ## Notes to remember
 - If notebook locked your db
     - check `lsof data/docintel.duckdb`. Returns the PID where there is a connection.
     - then `kill {PID}`
-
-
-
 

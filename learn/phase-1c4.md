@@ -386,6 +386,11 @@ uv run python -m docintel.evals.runner run --split dev --parser cuad_txt --model
 Each run prints its own `run_id`. The table in Step 4 has one row per model. Dev only: never run
 `--split test` to choose a model.
 
+New versions come out often. `deepseek/deepseek-v4-flash` is from April, and
+`deepseek/deepseek-v4.1-flash-1017` (MIT) is from October. To compare them, run the newer one the
+same way, with a pilot first. The date in the name keeps the model fixed, so later runs can be
+compared. Each provider has its own price, so the cost of a run can change too.
+
 Write the E1.1 entry in `EXPERIMENTS.md`:
 
 ```markdown
