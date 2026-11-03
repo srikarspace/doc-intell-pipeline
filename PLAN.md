@@ -273,6 +273,8 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 1c2 | batch run | threads, resume, CLI, pilot, resume test, E1 run | done |
 | 2 | 1c3 | E1 results | P/R/F1 per field + group (micro/macro decision), `report`, chart, real misses, metrics test | done |
 | 2 | 1c4 | model comparison | open-weights check, pilots, E1.1 table, model decision (no new code) | doc ready |
+| 2 | 1d | scoring review | error review by cause, scoring fixes + rescore (E1.2) | doc ready |
+| 2 | 1d2 | prompt v2 | keep rule, prompt v2 for the weak fields (E1.3) | planned |
 | 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | planned |
 | 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
 | 2 | 3a | parsers | common `parse()` interface, pypdf, Docling, Qwen3-VL (~10 docs), disk cache | planned |
@@ -356,19 +358,28 @@ scoring threshold; which fields are weakest and a hypothesis why.
 > open-weight models (e.g. a Qwen3.6/3.8 open model, DeepSeek V4 Flash; confirm open weights
 > first), P/R vs cost per model; which model to keep is a user decision."
 
+> **1d Scoring review + prompt v2 (user decisions):** "Start from the kept E1.1 run
+> (`20261102-200003`, deepseek/deepseek-v4-flash, prompt v1). Read a sample of its errors and sort
+> each by cause: prompt, scoring, lawyer labels, or hard contract. Scoring first: change a rule only
+> where a right answer is marked wrong, then rescore with no LLM calls and log E1.2; rescore the
+> other E1.1 runs too, so all models use the same rule. Then prompt v2 as a new folder, with
+> specific rules for the weak fields; run it on dev with the same model and the new rules, and log
+> E1.3. One change at a time, and check both precision and recall. Keep v2 only if it passes a rule
+> the user writes before the run. No schema change. Dev only."
+
 ---
 
 ## Phase 2: trust layer (the agentic part)
 
-**Done when:** before/after vs E1: validation failure rate, hallucinated quotes caught, retry
-lift, needs-review rate. Logged as E2.x.
+**Done when:** before/after vs the final 1d run (kept model, prompt and scoring rules): validation
+failure rate, hallucinated quotes caught, retry lift, needs-review rate. Logged as E2.x.
 
 **Learning checkpoint:** explain why this is "agentic" vs a pipeline; what failed most; whether
 retries were worth the extra cost; why lawyers care more about recall on some fields.
 
 > **2a Validators + citations (user decisions):** "Validator rules (date sanity, expiration
 > after start, enums, non-empty quote when found) and quote matching rules (normalized/fuzzy) are
-> user decisions. Worked examples of real near-misses from E1 output. Needs-review rules. Small
+> user decisions. Worked examples of real near-misses from stored runs (E1 and the final 1d run). Needs-review rules. Small
 > test with fake model responses (valid, malformed, wrong types, hallucinated quote)."
 
 > **2b Retry + trust experiments:** "On failure, send the errors back to the model, max 2
