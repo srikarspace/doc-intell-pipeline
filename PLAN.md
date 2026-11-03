@@ -358,14 +358,18 @@ scoring threshold; which fields are weakest and a hypothesis why.
 > open-weight models (e.g. a Qwen3.6/3.8 open model, DeepSeek V4 Flash; confirm open weights
 > first), P/R vs cost per model; which model to keep is a user decision."
 
-> **1d Scoring review + prompt v2 (user decisions):** "Start from the kept E1.1 run
-> (`20261102-200003`, deepseek/deepseek-v4-flash, prompt v1). Read a sample of its errors and sort
-> each by cause: prompt, scoring, lawyer labels, or hard contract. Scoring first: change a rule only
-> where a right answer is marked wrong, then rescore with no LLM calls and log E1.2; rescore the
-> other E1.1 runs too, so all models use the same rule. Then prompt v2 as a new folder, with
-> specific rules for the weak fields; run it on dev with the same model and the new rules, and log
-> E1.3. One change at a time, and check both precision and recall. Keep v2 only if it passes a rule
-> the user writes before the run. No schema change. Dev only."
+> **1d Scoring review (user decisions):** "Start from the kept E1.1 run (`20261102-200003`,
+> deepseek/deepseek-v4-flash, prompt v1). Read a sample of its errors and sort each by cause:
+> prompt, scoring, lawyer labels, or hard contract. Scoring first: change a rule only where a right
+> answer is marked wrong, then rescore with no LLM calls and log E1.2; rescore the other E1.1 runs
+> too, so all models use the same rule. One change at a time, and check both precision and recall.
+> No schema change. Dev only."
+
+> **1d2 Prompt v2 (user decisions):** "Needs E1.2 first. Start from the errors left on the kept run
+> under the user's E1.2 rules, and the causes the user wrote down in 1d. Prompt v2 as a new folder,
+> with specific rules for the weak fields; run it on dev with the same model and the E1.2 rules, and
+> log E1.3. One change at a time, and check both precision and recall. Keep v2 only if it passes a
+> rule the user writes before the run. No schema change. Dev only."
 
 ---
 
