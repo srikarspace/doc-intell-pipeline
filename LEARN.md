@@ -143,6 +143,12 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - When selecting a modal we need to check license. For business most models with Apache or MIT are fine to use.
     - Reasoning models can add additional tokens for reasoning and that may be considered as output tokens and our overall cost can be higher.
     - We need to choose when after comparing F1, cost, p_50, p_95 and bad answers
+    - Sometimes models can have same F1 but we will have to decide what product wants when we compare FP vs FN's
+
+- Adjust score rules:
+    - Sometimes the scoring rules can be too hard on the model responses.
+    - We need to check the errors and adjust them before adjusting the prompt because we might be scoring again against wrong rules.
+    - 
 
 ## Notes to remember
 - If notebook locked your db

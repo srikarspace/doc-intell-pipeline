@@ -12,7 +12,7 @@ THRESHOLD = 0.5  # token Jaccard needed for a quote to match a gold span (the CU
 RULE = {  # field -> how a found answer is judged correct
     "agreement_date": "value",
     "governing_law": "value",
-    "parties": "quote",
+    "parties": "names",
     "renewal_term": "quote",
     "notice_period_to_terminate_renewal": "quote",
     "cap_on_liability": "quote",
@@ -32,9 +32,30 @@ def jaccard(a: str, b: str) -> float:
     return len(ta & tb) / len(ta | tb)
 
 
+INSIDE = 0.8  # share of a quote's words that must be in the span
+MIN_WORDS = 4  # a shorter quote is too small to prove anything
+
+
+def inside(quote: str, span: str) -> bool:
+    """True if the quote is part of the span: enough words, and nearly all are in the span."""
+    q, s = tokens(quote), tokens(span)
+    return len(q) >= MIN_WORDS and len(q & s) / len(q) >= INSIDE
+
+
 def quote_ok(quotes: list[str], spans: list[str]) -> bool:
-    """True if any model quote matches any gold span well enough."""
-    return any(jaccard(q, s) >= THRESHOLD for q in quotes for s in spans)
+    """True if any model quote matches a gold span well enough, or is a part of one."""
+    return any(jaccard(q, s) >= THRESHOLD or inside(q, s) for q in quotes for s in spans)
+
+
+def name_ok(name: str, span: str) -> bool:
+    """True if one name holds the other, or they share most words: "Acme" and "Acme, Inc."."""
+    a, b = tokens(name), tokens(span)
+    return bool(a and b) and (a <= b or b <= a or jaccard(name, span) >= THRESHOLD)
+
+
+def names_ok(names: list[str], spans: list[str]) -> bool:
+    """True if the model gave names, and every one of them matches a gold span."""
+    return bool(names) and all(any(name_ok(n, s) for s in spans) for n in names)
 
 
 def norm_date(text: str | None) -> str | None:
@@ -57,22 +78,35 @@ def norm_date(text: str | None) -> str | None:
     return "-".join(known)
 
 
+LAW_WORDS = {"the", "state", "of", "laws", "commonwealth", "province", "republic", "and"}
+
+
 def norm_law(text: str | None) -> str | None:
     """Normalize a place: "the State of New York" -> "new york"."""
     if not text:
         return None
-    words = " ".join(sorted(tokens(text) - {"the", "state", "of", "laws", "commonwealth"}))
+    words = " ".join(sorted(tokens(text) - LAW_WORDS))
     return words or None
 
 
 def value_ok(field: str, value: str | None, answer: str | None) -> bool | None:
     """Compare a normalized value with the CUAD answer. None if the answer has no usable value."""
     norm = norm_date if field == "agreement_date" else norm_law
-    golds = [norm(part) for part in (answer or "").split(";")]
+    parts = (answer or "").split(";")
+    golds = [norm(part) for part in [*parts, " ".join(parts)]]  # each place, or all of them
     golds = [g for g in golds if g]
     if not golds:
         return None
     return norm(value) in golds
+
+
+def blank_date(field: str, spans: list[str]) -> bool:
+    """A date the lawyers marked in a form, but with no year filled in: "[●]" or "20___"."""
+    return (
+        field == "agreement_date"
+        and bool(spans)
+        and not any(re.search(r"\d{4}", span) for span in spans)
+    )
 
 
 def outcome(gold_present: bool, found: bool, correct: bool) -> tuple[int, int, int]:
@@ -105,11 +139,16 @@ def score_doc(con: duckdb.DuckDBPyConnection, doc_id: str, pred: ContractFields)
         answer_field = getattr(pred, field)
         rule = RULE.get(field, "presence")
         q_ok = quote_ok(answer_field.quotes, spans)
-        v_ok = value_ok(field, answer_field.value, answer) if rule == "value" else None
+        v_ok = None
+        if rule == "value":
+            v_ok = value_ok(field, answer_field.value, answer)
+        elif rule == "names":
+            v_ok = names_ok(answer_field.value, spans)
         if rule == "value" and v_ok is None:
-            rule = "quote"  # CUAD has no usable value here, so judge the quote
-        correct = {"presence": True, "quote": q_ok, "value": v_ok}[rule]
-        tp, fp, fn = outcome(present, answer_field.found, correct)
+            rule = "blank" if blank_date(field, spans) else "quote"  # no usable CUAD value
+        checks = {"presence": True, "quote": q_ok, "value": v_ok, "names": v_ok, "blank": True}
+        correct = checks[rule]
+        tp, fp, fn = (0, 0, 0) if rule == "blank" else outcome(present, answer_field.found, correct)
         rows.append(
             {
                 "field": field,

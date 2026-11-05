@@ -713,6 +713,7 @@ With the reference rule, the two new wrong answers are:
 ```python
 from docintel.evals.scorers import names_ok, quote_ok
 
+RUN = "20261102-200003"  # V4 Flash, the kept model
 QUOTE_FIELDS = ["renewal_term", "notice_period_to_terminate_renewal", "cap_on_liability"]
 rows = con.execute("SELECT doc_id FROM splits WHERE split = 'dev' ORDER BY doc_id").fetchall()
 docs = [doc for (doc,) in rows]
@@ -747,7 +748,7 @@ for doc in docs:
 print(f"quotes against other fields: {passed} of {tried} pass")
 
 tried = passed = 0
-for doc, next_doc in zip(docs, docs[1:] + docs[:1]):
+for doc, next_doc in zip(docs, docs[1:] + docs[:1], strict=True):
     tried += 1
     if names_ok(answers(doc)["parties"]["value"], spans(next_doc, "parties")):
         passed += 1
@@ -764,7 +765,7 @@ quotes against other fields: 0 of 355 pass
 names against the next contract: 2 of 52 pass
 ```
 
-*Python here: [`zip(docs, docs[1:] + docs[:1])`](./py/phase-1d.md#py-7).*
+*Python here: [`zip(docs, docs[1:] + docs[:1], strict=True)`](./py/phase-1d.md#py-7).*
 
 The cell tests each quote against other fields' gold in the same contract, and each list of names
 against the next contract's gold. It prints each pass, so a person can check it. Both passes here are

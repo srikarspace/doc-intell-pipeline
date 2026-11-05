@@ -3,7 +3,17 @@
 import pytest
 
 from docintel.domain.schema.fields import CUAD_CATEGORY, ContractFields, Names
-from docintel.evals.scorers import jaccard, norm_date, outcome, score_doc
+from docintel.evals.scorers import (
+    blank_date,
+    inside,
+    jaccard,
+    names_ok,
+    norm_date,
+    outcome,
+    quote_ok,
+    score_doc,
+    value_ok,
+)
 from docintel.evals.store import connect
 
 LAW = "This Agreement shall be governed by the laws of the State of Michigan."
@@ -65,3 +75,45 @@ def test_score_doc_counts_absent_fields():
     assert (rows["governing_law"]["tp"], rows["governing_law"]["value_ok"]) == (1, True)
     assert rows["non_compete"]["fp"] == 1
     assert sum(r["tp"] + r["fp"] + r["fn"] for r in rows.values()) == 2  # 10 true negatives
+
+
+GOLD_SENTENCE = (
+    "this Agreement shall automatically renew for successive additional three-year terms"
+)
+
+
+def test_inside_needs_enough_words_from_the_span():
+    assert inside("automatically renew for successive additional", GOLD_SENTENCE)
+    assert not inside("three-year", GOLD_SENTENCE)  # too short to prove anything
+    assert not inside(LAW + " " + GOLD_SENTENCE, GOLD_SENTENCE)  # a long quote is not "inside"
+    assert quote_ok(["automatically renew for successive additional"], [GOLD_SENTENCE])
+
+
+def test_names_must_all_match_a_gold_span():
+    spans = ["2THEMART.COM, INC.", "I-ESCROW, INC.", "i-Escrow", "2TheMart"]
+    assert names_ok(["I-ESCROW, INC.", "2THEMART.COM, INC."], spans)
+    assert names_ok(["I-Escrow"], spans)  # one name is enough: this rule cannot see a missing party
+    assert not names_ok(["I-ESCROW, INC.", "Acme Corp."], spans)
+    assert not names_ok([], spans)
+
+
+def test_blank_date_is_only_a_date_with_no_year():
+    assert blank_date("agreement_date", ["[●]"])
+    assert blank_date("agreement_date", ["this _____ day of _________, 20___"])
+    assert not blank_date("agreement_date", ["June 21, 1999"])
+    assert not blank_date("agreement_date", [])
+    assert not blank_date("governing_law", ["[●]"])
+
+
+@pytest.mark.parametrize(
+    ("value", "answer", "expected"),
+    [
+        ("Ontario, Canada", "Province of Ontario, Canada", True),
+        ("South Africa", "Republic of South Africa", True),
+        ("California and Hong Kong", "California; Hong Kong", True),
+        ("California", "California; Hong Kong", True),
+        ("Delaware", "California; Hong Kong", False),
+    ],
+)
+def test_governing_law_values(value, answer, expected):
+    assert value_ok("governing_law", value, answer) is expected
