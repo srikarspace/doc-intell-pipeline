@@ -72,7 +72,7 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
 
 ## E1.2: using different scoring rules for E1.1
 - **Date:** 2026-11-05
-- **Score rules Hash:** not committed yet (old rules: `f8a2f10`)
+- **Score rules Hash:** `6ffdaa7` (old rules: `f8a2f10`)
 - **run_id(s):** the 5 full runs in E1.1. Same answers, new marks. No LLM calls, $0.
 - **Question / hypothesis:** How many of V4's 87 errors are the rule's fault? Do the weak fields or
   the model choice change?
@@ -109,3 +109,58 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   ($0.204). GLM-5.3 is level on F1 with higher recall. Weakest now: non_compete (0.67),
   change_of_control (0.70) and notice_period_to_terminate_renewal (0.70).
 - **Next step:** 1d2, prompt v2 for the weak fields, on these rules (E1.3).
+
+## E1.3: using different prompt
+- **Date:** 2026-11-05
+- **Score rules Hash:** `6ffdaa7` (same rules as E1.2)
+- **run_id(s):** clean test, both on Parasail: v1 20261105-213036, v2 20261105-213505. Also v2 on mixed
+  providers 20261105-201546, and v1 on Crusoe 20261102-200003 (from E1.1). Pilots, not used:
+  20261105-201438, 20261105-212323, 20261105-212948. Stopped: 20261105-212357 (DeepInfra was
+  overloaded, 429 `engine_overloaded`, 3 of 52 done).
+- **Question / hypothesis:** Do specific rules for 4 weak fields beat v1, without losing recall?
+- **Setup:** deepseek/deepseek-v4-flash, cuad_txt, temperature 0, no validation retries. Only the prompt
+  changes: v1 -> v2. Target fields: non_compete, notice_period_to_terminate_renewal, cap_on_liability,
+  ip_ownership_assignment. The first v2 run landed on other providers than v1 (Crusoe no longer serves
+  V4 Flash), so both prompts were run again with the provider pinned to Parasail (fp8).
+- **Keep rule (written before the run):** keep v2 only if all of these are true, against
+  20261102-200003:
+  1. All-field F1 is at least 0.927 (0.912 + 0.015, a little more than the noise guess).
+  2. Recall is at least 0.925 (287 TP: it can lose 3).
+  3. The low end of the `gap` range is above 0.
+  4. 0 bad answers.
+  5. Cost is at most $0.255, and p95 at most 71.9 s (1.25 times v1).
+  6. Wrong-quote TPs are at most 6 (v1 has 4).
+  If v2 fails, v1 stays. A v3 needs its own new entry and rule.
+- **Results:**
+
+  | Run | Provider | P | R | F1 | Cost | Out tokens | p95 | Bad | Wrong-quote TPs |
+  |---|---|---|---|---|---|---|---|---|---|
+  | v1 (E1.2) | Crusoe | 0.890 | 0.935 | 0.912 | $0.204 | 8,953 | 57.5 s | 0 | 4 |
+  | v1 | Parasail | 0.901 | 0.913 | 0.907 | $0.112 | 2,601 | 37.3 s | 0 | 10 |
+  | v2 | Parasail | 0.895 | 0.939 | 0.917 | $0.114 | 2,594 | 47.2 s | 0 | 11 |
+  | v2 | Venice 40, Parasail 11, DigitalOcean 1 | 0.886 | 0.926 | 0.905 | $0.087 | 2,567 | 103.1 s | 0 | 6 |
+
+  F1 gaps with 95% ranges (bootstrap, 4,000 re-samples, seed 7):
+  - Prompt, v2 minus v1, both Parasail: +0.009 (-0.010 to +0.030): could be zero.
+  - Provider, v1 Parasail minus v1 Crusoe: -0.005 (-0.028 to +0.019): could be zero.
+  - v2 Parasail minus v1 Crusoe (keep rule): +0.005 (-0.021 to +0.030).
+
+  Field F1 on Parasail, v1 -> v2:
+  - Targets: cap_on_liability 0.81 -> 0.94 (FN 7 -> 0), ip_ownership_assignment 0.87 -> 0.91,
+    non_compete 0.71 -> 0.67 (FP 5 -> 7), notice_period_to_terminate_renewal 0.63 -> 0.57 (FP 4 -> 6).
+  - Side effect: non_transferable_license 0.88 -> 0.73 (FP 4 -> 7), not a target field.
+  - The mixed-provider v2 run moved the same way for cap (0.79 -> 0.91) and non_transferable_license
+    (0.93 -> 0.81).
+- **Limits:** The rules were written from dev errors, so any gain is optimistic, and test gives the
+  final number. Two v2 runs differ by 0.012 F1, about the size of the prompt effect. `llm_calls` has no
+  `doc_id`, so a mixed-provider run cannot be split by provider.
+- **Conclusion:** v2 is not kept, so v1 stays. Against the rule: 1 fails (F1 0.917 < 0.927), 2 passes
+  (R 0.939), 3 fails (low end -0.021), 4 passes, 5 passes ($0.114, p95 47.2 s), 6 fails (11 > 6).
+  - The cap_on_liability rule works: FN went to 0 in both v2 runs.
+  - The non_compete and notice_period rules did not help in either run, and FPs went up.
+  - Wrong-quote TPs rise with Parasail for both prompts (10 and 11, against 4 on Crusoe), so rule 6
+    mostly measures the provider, not the prompt.
+  - Parasail gives the same F1 as Crusoe with about 70% fewer output tokens, at about half the cost
+    and a lower p95.
+- **Next step:** Decide on a v3 with only the cap_on_liability rule (new entry and rule), and which
+  provider to use. Remove the temporary Parasail pin in `core/llm.py`. Then 2a.

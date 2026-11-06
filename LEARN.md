@@ -138,17 +138,27 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Then get F1, TP, FP, FN calculate precision, recall
     - Create a graph for the labels and compare with all the labels
 
-- Models:
+- Models(E1):
     - We need to test different models with a same experiment(data, prompt, score formula)
     - When selecting a modal we need to check license. For business most models with Apache or MIT are fine to use.
     - Reasoning models can add additional tokens for reasoning and that may be considered as output tokens and our overall cost can be higher.
     - We need to choose when after comparing F1, cost, p_50, p_95 and bad answers
     - Sometimes models can have same F1 but we will have to decide what product wants when we compare FP vs FN's
 
-- Adjust score rules:
+- Adjust score rules(E2):
     - Sometimes the scoring rules can be too hard on the model responses.
     - We need to check the errors and adjust them before adjusting the prompt because we might be scoring again against wrong rules.
-    - 
+    - Adjusting rules is free as we run them over previous results.
+
+- Adjust prompt(E3):
+    - Prompt change can fix some while it can break others. So having some rules before changing is better.
+    - Adding new prompts costs us.
+    - We add rules per label. One folder with all the rules.
+    - Score is frozen as well. We will adjust later for new errors if needed.
+    - Now update system prompt where we have fields with new rules.
+    - Add rules for v2 to keep. Only when these rules pass against v1 we will keep v2.
+    - Important learning is that we need to lockin the provider because when choosing different prompts each provider serve differently and that causes differences in results.
+
 
 ## Notes to remember
 - If notebook locked your db

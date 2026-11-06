@@ -357,7 +357,7 @@ PHRASE = re.compile(
 
 def contract(doc_id):
     (path,) = con.execute("SELECT txt_path FROM contracts WHERE doc_id = ?", [doc_id]).fetchone()
-    return Path(path).read_text(encoding="utf-8")
+    return (Path("..") / path).read_text(encoding="utf-8")  # paths start at the project folder
 
 
 rows = con.execute(
@@ -588,7 +588,8 @@ models, and the sample is small.
 base = per_doc(RUN)
 docs = sorted(base)
 errors = con.execute(
-    "SELECT doc_id, fp, fn FROM scores WHERE run_id = ? AND fp + fn > 0 ORDER BY doc_id, field", [RUN]
+    "SELECT doc_id, fp, fn FROM scores WHERE run_id = ? AND fp + fn > 0 ORDER BY doc_id, field",
+    [RUN],
 ).fetchall()
 
 
