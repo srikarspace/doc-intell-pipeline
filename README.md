@@ -16,11 +16,24 @@ Built from **Project 1: Document intelligence pipeline** in [AI Engineer Project
 | Phase | Parts | Status |
 |---|---|---|
 | 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) loader · [0c](./learn/phase-0c.md) explore · [0d](./learn/phase-0d.md) fields + split | done |
-| 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | in progress |
-| 2 trust layer | validators + citations · retry experiments | planned |
+| 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | done |
+| 2 trust layer | [2a](./learn/phase-2a.md) validators + citations · needs-review rules · retry experiments | in progress |
 | 3 parser comparison | pypdf, Docling, Qwen3-VL · scans | planned |
 | 4 service | planner + API · observability · Docker, Cloud Run, CI · UI | planned |
 | 5 write-up | figures, README, mock interview | planned |
+
+## Results so far (dev, 52 contracts, 12 fields)
+
+| Experiment | What changed | F1 |
+|---|---|---|
+| E1 | Qwen3-235B, prompt v1 | 0.705 |
+| E1.1 | DeepSeek V4 Flash, same prompt. Tied with the other new models, kept for cost and p95 | 0.801 |
+| E1.2 | Fairer scoring rules, same stored answers, no new calls (E1 becomes 0.827) | 0.912 |
+| E1.3 | Prompt v2 for 4 weak fields, on Parasail. Not kept: the gain could be zero, and it failed the keep rule written before the run | 0.917 (v1 on Parasail: 0.907) |
+
+E1 and E1.1 use the old scoring rules. Phase 2 builds on the E1.2 row: DeepSeek V4 Flash, prompt v1,
+run `20261102-200003`. Details and limits are in [EXPERIMENTS.md](./EXPERIMENTS.md). Test split numbers
+come at the end.
 
 There are two notes for each part. `learn/phase-N.md` covers what the part builds and why. `learn/py/phase-N.md` covers the Python it uses. The full plan is in [PLAN.md](./PLAN.md), and runs are logged in [EXPERIMENTS.md](./EXPERIMENTS.md).
 

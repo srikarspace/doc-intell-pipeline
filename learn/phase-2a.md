@@ -1,8 +1,8 @@
 # Phase 2a: validators and quote checks
 
 In this part, you decide what makes an answer broken, then build the code that finds it. You build
-one small module at a time, and check it on the answers already stored from E1 and E1.1. There are
-no LLM calls and no cost.
+one small module at a time, and check it on the answers already stored from E1, E1.1 and E1.3. There
+are no LLM calls and no cost.
 
 This is part 1 of 2 for Phase 2a. Part 2 (2a2) adds needs-review rules and stores the results.
 
@@ -39,7 +39,7 @@ By the end of this part you should be able to:
 1. Explain the difference between a shape rule and a content rule, with a real example of each.
 2. Explain why one bad field must not blank the other 11 fields.
 3. Check if a quote is really in a contract, and say why a fuzzy score is the wrong tool.
-4. Give four real near-misses from E1 and E1.1, and say what the check does with each.
+4. Give four real near-misses from stored runs, and say what the check does with each.
 5. Run your rules on a stored run, and read the counts.
 
 ## Dependencies
@@ -49,7 +49,10 @@ You install nothing new. This part needs:
 - 1a: the `Strict` base model and `ContractFields`.
 - 1a2: `LLMResult` and `_parse` in `core/llm.py`.
 - 1c: `from_rows` in `evals/runner.py`, and the stored runs.
-- 1c4: the kept model, DeepSeek V4 Flash, run `20261102-200003`.
+- 1d: the E1.2 scoring rules. Every F1 in this doc uses them.
+- 1d2: E1.3. Prompt v1 stays, so the kept run is still `20261102-200003` (DeepSeek V4 Flash, prompt
+  v1, served by Crusoe), now marked by the E1.2 rules. E1.3 also stored a v1 run of the same model
+  on Parasail.
 
 ## The big picture
 
@@ -69,8 +72,11 @@ What later parts do with that list:
 - **Phase 3** runs the same checks on text from worse parsers.
 - **Phase 4** shows the flags to the user in the API and the UI.
 
-The kept model is now the baseline, not E1. Your rates come from run `20261102-200003`. Many
-near-miss examples come from E1, because E1 makes more of them.
+The kept run is the baseline, not E1. Your rates come from run `20261102-200003`. Many near-miss
+examples come from E1, because E1 makes more of them.
+
+Crusoe no longer serves V4 Flash, so new runs in 2b will use another provider. So we also check the
+E1.3 run on Parasail (`20261105-213036`): same model, same prompt v1, another provider.
 
 ## Remember this
 
@@ -170,6 +176,9 @@ One change fixes a typo. The other cites the wrong list item. Can a program tell
 Not without understanding the text. To a program, both are "one small piece changed". A check that
 forgives the first one also forgives the second one.
 
+The same model on Parasail does this twice in E1.3. Coral Gold comes back, and in Upjohn, `11∕2` (a
+fraction the text lost) becomes `1½`.
+
 So both count as `missing` in the reference. The Coral Gold quote is a false alarm, and we accept
 that. Prompt v1 says "Do not fix spelling", so it is also a real rule break.
 </details>
@@ -237,9 +246,10 @@ Look at the evidence. These are real numbers from Step 5, on stored answers:
 | Question | Option A | Option B |
 |---|---|---|
 | A field breaks a rule. What happens? | All 12 fields are blanked | Only that field gets an issue |
-| Kept model, F1 0.801, errors only | 0.793 (2 contracts blanked, 7 correct fields lost) | 0.801 |
-| Kept model, errors and warnings | 0.738 (8 contracts blanked, 39 correct fields lost) | 0.801 |
-| E1, F1 0.705, errors only | 0.627 (11 contracts blanked, 50 correct fields lost) | 0.705 |
+| Kept model, F1 0.912, errors only | 0.904 (2 contracts blanked, 7 correct fields lost) | 0.912 |
+| Kept model, errors and warnings | 0.845 (8 contracts blanked, 42 correct fields lost) | 0.912 |
+| Same model on Parasail, F1 0.907, errors only | 0.872 (5 contracts blanked, 23 correct fields lost) | 0.907 |
+| E1, F1 0.827, errors only | 0.733 (11 contracts blanked, 58 correct fields lost) | 0.827 |
 | How does the rule get the contract text? | Through Pydantic's `context` argument | A normal function argument |
 | Does the provider see the rule? | No | No |
 | Can old runs be rebuilt with `from_rows`? | Not all (Break 1) | Yes |
@@ -324,22 +334,31 @@ Here are the options, from strict to loose:
 separately, so a quote is in one column only. You reproduce this table in Step 3.
 
 ```text
-run        quotes same_bytes same_words  gap missing no_words
-V4 (kept)     424        395        417    6       0        1
-E1            441        342        429    9       3        0
-Qwen3.8       408        372        404    4       0        0
-GLM-5.3       413        361        403   10       0        0
-V4.1          406        360        387    9       9        1
+run             quotes same_bytes same_words  gap missing no_words
+V4 (kept)          424        395        417    6       0        1
+V4 v1 Parasail     432        370        418   12       2        0
+E1                 441        342        429    9       3        0
+Qwen3.8            408        372        404    4       0        0
+GLM-5.3            413        361        403   10       0        0
+V4.1               406        360        387    9       9        1
 ```
 
 Read the kept model's row:
 
 1. Same bytes fails 29 of 424 quotes. All 29 are spaces, case, page breaks, or a typo fix.
 2. Same words and `no_words` leave only 7 to look at: 6 with a gap, and the `[●]` from Round 3.
-3. **`missing` is 0. The kept model made up no quotes on these 52 contracts.** Say this honestly in
-   your write-up. The check is insurance, and the real number caught is zero.
+3. **`missing` is 0. The kept model made up no quotes on these 52 contracts.**
 
-**Evidence 2: real gaps.** The biggest gaps in all 5 runs:
+Now read the Parasail row: the same model and prompt, on another provider.
+
+1. It has 2 `missing` quotes. Neither has made-up words. Both fix broken contract text (Round 2).
+2. It has twice as many `gap` quotes. Three of the 12 are cuts with `...`, not page breaks. The prompt
+   does not allow `...`, and a warning is the right answer for them too.
+
+Say this honestly in your write-up. The check is insurance, and the real number of made-up quotes
+caught is zero. But a new provider changes how often the model breaks the copy rule.
+
+**Evidence 2: real gaps.** The biggest gaps in all 6 runs:
 
 - 1 word: a page number, like `Massachusetts, 13 in each case` in the Nuveen contract.
 - 10 words: the page footer from Round 1.
@@ -658,13 +677,14 @@ from docintel.evals.store import connect
 
 RUNS = {
     "V4 (kept)": "20261102-200003",
+    "V4 v1 Parasail": "20261105-213036",
     "E1": "20261101-192153",
     "Qwen3.8": "20261102-194826",
     "GLM-5.3": "20261102-200841",
     "V4.1": "20261102-202705",
 }
 print(
-    f"{'run':10} {'quotes':>6} {'same_bytes':>10} {'same_words':>10} {'gap':>4} {'missing':>7} {'no_words':>8}"
+    f"{'run':15} {'quotes':>6} {'same_bytes':>10} {'same_words':>10} {'gap':>4} {'missing':>7} {'no_words':>8}"
 )
 with connect() as con:
     for name, run_id in RUNS.items():
@@ -678,7 +698,7 @@ with connect() as con:
                 same_bytes += quote in text
                 status[quote_status(quote, source_words)] += 1
         print(
-            f"{name:10} {n:6} {same_bytes:10} {status['same_words']:10} {status['gap']:4} "
+            f"{name:15} {n:6} {same_bytes:10} {status['same_words']:10} {status['gap']:4} "
             f"{status['missing']:7} {status['no_words']:8}"
         )
 EOF
@@ -709,6 +729,8 @@ value_not_found            0    0        0        0     0
 bad_date                   0    0        0        0     0
 ```
 
+The Parasail run adds only `found_no_value`, 4 times. Every other rule stays at 0.
+
 What each one means, with real examples:
 
 - **`found_no_quote`**: `found` is true, with no quotes. It never happens. It is still the most
@@ -720,7 +742,7 @@ What each one means, with real examples:
   `renewal_term` in the Pareteum contract, with the quote `automatically extended for consecutive
   *** periods`. The number is redacted, so no retry can ever find it.
 - **`value_not_found`**: `found` is false, with a value.
-- **`bad_date`**: `agreement_date` is not a real date. **0 of 228 dates fail in all 5 runs.** So this
+- **`bad_date`**: `agreement_date` is not a real date. **0 of 270 dates fail in all 6 runs.** So this
   rule catches nothing today. It is one small function, and it guards against worse parsers and
   models later. Whether to keep it is your choice.
 
@@ -946,7 +968,11 @@ from docintel.domain.validate.rules import check_answer
 from docintel.evals.runner import cuad_txt, from_rows
 from docintel.evals.store import connect
 
-RUNS = {"V4 (kept)": "20261102-200003", "E1": "20261101-192153"}
+RUNS = {
+    "V4 (kept)": "20261102-200003",
+    "V4 v1 Parasail": "20261105-213036",
+    "E1": "20261101-192153",
+}
 
 
 def f1(tp, fp, fn):
@@ -986,13 +1012,17 @@ EOF
 
 ```text
 V4 (kept) {'quote_gap': 6, 'found_no_value': 3, 'quote_no_words': 1}
-  field by field: 256 TP, F1 0.801
-  whole contract, errors: 2 blanked, 249 TP, F1 0.793
-  whole contract, errors + warnings: 8 blanked, 217 TP, F1 0.738
+  field by field: 290 TP, F1 0.912
+  whole contract, errors: 2 blanked, 283 TP, F1 0.904
+  whole contract, errors + warnings: 8 blanked, 248 TP, F1 0.845
+V4 v1 Parasail {'quote_gap': 12, 'found_no_value': 4, 'quote_missing': 2}
+  field by field: 283 TP, F1 0.907
+  whole contract, errors: 5 blanked, 260 TP, F1 0.872
+  whole contract, errors + warnings: 14 blanked, 194 TP, F1 0.746
 E1 {'quote_gap': 9, 'quote_not_found': 6, 'found_no_value': 4, 'quote_missing': 3}
-  field by field: 238 TP, F1 0.705
-  whole contract, errors: 11 blanked, 188 TP, F1 0.627
-  whole contract, errors + warnings: 18 blanked, 146 TP, F1 0.537
+  field by field: 278 TP, F1 0.827
+  whole contract, errors: 11 blanked, 220 TP, F1 0.733
+  whole contract, errors + warnings: 18 blanked, 172 TP, F1 0.632
 ```
 
 *Python here: `defaultdict`: [0d PY-3](./py/phase-0d.md#py-3) · `(x for ...)`:
@@ -1001,9 +1031,10 @@ E1 {'quote_gap': 9, 'quote_not_found': 6, 'found_no_value': 4, 'quote_missing': 
 Read it:
 
 1. The kept model has only 3 errors on 52 contracts, all `found_no_value`.
-2. E1 has 13. So the same rules also measure how well a model follows the prompt.
-3. "Whole contract" lines show what Option A from Step 1 would cost.
-4. "Field by field" is exactly the F1 in `report`. Your rules did not change a score.
+2. On Parasail, the same model and prompt have 6. The two `quote_missing` are fixes of broken text.
+3. E1 has 13. So the same rules also measure how well a model follows the prompt.
+4. "Whole contract" lines show what Option A from Step 1 would cost.
+5. "Field by field" is exactly the F1 in `report`. Your rules did not change a score.
 
 ## Step 6: the test file
 
@@ -1161,7 +1192,7 @@ make test
 ```
 
 ```text
-53 passed in 0.62s
+63 passed in 0.79s
 ```
 
 `make lint` should also pass for your new files.
@@ -1409,19 +1440,22 @@ At `MAX_GAP` 0, the check reports 6 made-up quotes on a model that made up none.
 
 ## Experiment
 
-This part makes no new run. The replay in Step 5 reads stored runs `20261102-200003` and
-`20261101-192153`. The results are logged in 2a2 as E2.0, with the review rules added. Dev only:
-never replay on the test split to choose a rule.
+This part makes no new run. The replay in Step 5 reads stored runs `20261102-200003`,
+`20261105-213036` and `20261101-192153`. The results are logged in 2a2 as E2.0, with the review rules
+added. Dev only: never replay on the test split to choose a rule.
 
 ## Gotchas
 
 - **"Real" does not mean "right".** A quote that passes proves it is in the contract. It does not
-  prove it answers the question. 2a2 shows how often this happens.
+  prove it answers the question. E1.3 counted wrong-quote TPs: 4 on Crusoe, 10 on Parasail. 2a2
+  shows how often this happens.
 - **`same_words` ignores punctuation.** `$100` and `100%` both become `100`. The quote check does not
   see that change.
 - **A short quote passes easily.** `Company` is in almost every contract. The parties quotes are often
   this short.
 - **The database is locked.** Close the notebook connection first.
+- **`core/llm.py` still pins Parasail.** E1.3 added the pin for one experiment. 2a makes no calls, so
+  it does not matter here. Decide the provider before the first new run in 2b.
 
 ## Explain back, then commit
 
@@ -1446,7 +1480,8 @@ What you have now:
 
 - `check_result`: an answer and its contract in, a list of issues out, field by field.
 - A quote check with real evidence for each choice, and no fuzzy score.
-- A real number for your write-up: the kept model made up 0 of 424 quotes on dev.
+- A real number for your write-up: the kept model made up 0 of 424 quotes on dev. On other
+  Parasail, 2 quotes fail the check, and neither has made-up words.
 
 Go back to the objectives. Check that you can do each one without notes. Then answer:
 

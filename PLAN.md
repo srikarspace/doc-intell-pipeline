@@ -272,10 +272,10 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 1c | store + score a run | `runs`/`predictions`/`scores` tables, cost estimate, bad-answer rule, `score(run_id)`, row test | done |
 | 2 | 1c2 | batch run | threads, resume, CLI, pilot, resume test, E1 run | done |
 | 2 | 1c3 | E1 results | P/R/F1 per field + group (micro/macro decision), `report`, chart, real misses, metrics test | done |
-| 2 | 1c4 | model comparison | open-weights check, pilots, E1.1 table, model decision (no new code) | doc ready |
-| 2 | 1d | scoring review | error review by cause, scoring fixes + rescore (E1.2) | doc ready |
-| 2 | 1d2 | prompt v2 | keep rule, prompt v2 for the weak fields (E1.3) | doc ready |
-| 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | planned |
+| 2 | 1c4 | model comparison | open-weights check, pilots, E1.1 table, model decision (no new code) | done |
+| 2 | 1d | scoring review | error review by cause, scoring fixes + rescore (E1.2) | done |
+| 2 | 1d2 | prompt v2 | keep rule, prompt v2 for the weak fields (E1.3) | done |
+| 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | doc ready |
 | 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
 | 2 | 3a | parsers | common `parse()` interface, pypdf, Docling, Qwen3-VL (~10 docs), disk cache | planned |
 | 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
