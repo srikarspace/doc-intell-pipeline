@@ -275,7 +275,8 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 1c4 | model comparison | open-weights check, pilots, E1.1 table, model decision (no new code) | done |
 | 2 | 1d | scoring review | error review by cause, scoring fixes + rescore (E1.2) | done |
 | 2 | 1d2 | prompt v2 | keep rule, prompt v2 for the weak fields (E1.3) | done |
-| 2 | 2a | validators + citations | Pydantic validators, quote-in-source check, needs-review rules | doc ready |
+| 2 | 2a | validators + citations | content rules outside the schema, quote-in-source check | done |
+| 2 | 2a2 | needs-review rules | review rules, `issues` table, `validate` replay, review report, E2.0 | doc ready |
 | 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
 | 2 | 3a | parsers | common `parse()` interface, pypdf, Docling, Qwen3-VL (~10 docs), disk cache | planned |
 | 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
@@ -385,6 +386,15 @@ retries were worth the extra cost; why lawyers care more about recall on some fi
 > after start, enums, non-empty quote when found) and quote matching rules (normalized/fuzzy) are
 > user decisions. Worked examples of real near-misses from stored runs (E1 and the final 1d run). Needs-review rules. Small
 > test with fake model responses (valid, malformed, wrong types, hallucinated quote)."
+
+> **2a2 Needs-review rules + stored issues (user decisions):** "Needs 2a. Start from 2a's
+> `check_result` and the E1.2 marks. First, what a review flag should catch: FP, FN, and wrong-quote
+> TPs (from 1d2). Then the review rules from evidence on stored dev runs (kept run and the Parasail v1
+> run): options with their review rate and catch rate, and the duration shape rule left open in 2a.
+> Review rules only report (warnings), and never read gold labels. Store every issue in DuckDB with a
+> `validate(run_id)` replay (no LLM calls), and a report of error rate, review rate and catch rate.
+> Log E2.0, the 'before' numbers for 2b. Small test (review rules, replay). No schema or prompt
+> change. Dev only."
 
 > **2b Retry + trust experiments:** "On failure, send the errors back to the model, max 2
 > retries; record each attempt (attempt_no, errors, fixed?) in DuckDB. Then E2.1 validation only,

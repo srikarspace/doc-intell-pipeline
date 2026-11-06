@@ -1480,7 +1480,7 @@ What you have now:
 
 - `check_result`: an answer and its contract in, a list of issues out, field by field.
 - A quote check with real evidence for each choice, and no fuzzy score.
-- A real number for your write-up: the kept model made up 0 of 424 quotes on dev. On other
+- A real number for your write-up: the kept model made up 0 of 424 quotes on dev. On
   Parasail, 2 quotes fail the check, and neither has made-up words.
 
 Go back to the objectives. Check that you can do each one without notes. Then answer:
