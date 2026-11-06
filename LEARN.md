@@ -159,6 +159,14 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Add rules for v2 to keep. Only when these rules pass against v1 we will keep v2.
     - Important learning is that we need to lockin the provider because when choosing different prompts each provider serve differently and that causes differences in results.
 
+### Phase 2: validators & citations, needs-review rules, retry experiments
+
+- validators and code check
+    - We need to check answers and return the list of issues that are easy to understand
+    - We write rules to verify the LLMs response
+    - Schema checks the LLM response only not the text in the response. We need to add rules to check the response text.
+    - We can add rules in schema check or keep them outside to check each field. We should choose outside because if we keep in schema if one breaks the whole contract breaks. While keeping outside checks only the failed labels and returns only the failed issues.
+    - 
 
 ## Notes to remember
 - If notebook locked your db
