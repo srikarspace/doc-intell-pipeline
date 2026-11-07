@@ -7,6 +7,7 @@ from docintel.core.llm import LLMResult
 from docintel.domain.schema.fields import ContractFields
 from docintel.domain.validate.citations import quote_status, words
 from docintel.domain.validate.issues import Issue
+from docintel.domain.validate.review import review_answer
 
 DATE_SHAPE = re.compile(r"\d{4}(-\d{2}(-\d{2})?)?")  # YYYY, YYYY-MM or YYYY-MM-DD, as in the prompt
 OLDEST_YEAR = 1900
@@ -68,7 +69,7 @@ def check_answer(fields: ContractFields, text: str) -> list[Issue]:
     issues = []
     for field in ContractFields.model_fields:
         issues += check_field(field, getattr(fields, field), source_words)
-    return issues
+    return issues + review_answer(fields, text)
 
 
 def bad_schema(detail: str) -> list[Issue]:

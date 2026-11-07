@@ -15,6 +15,7 @@ from docintel.core.config import get_settings
 from docintel.core.llm import LLMResult, log_call
 from docintel.domain.extract.extract import build_messages, extract
 from docintel.domain.schema.fields import ContractFields, Names
+from docintel.domain.validate.rules import bad_schema, check_answer
 from docintel.evals.scorers import metrics, score_doc
 from docintel.evals.store import connect
 
@@ -35,6 +36,9 @@ CREATE TABLE IF NOT EXISTS scores (
     run_id VARCHAR, doc_id VARCHAR, field VARCHAR, rule VARCHAR, gold_present BOOLEAN,
     found BOOLEAN, quote_ok BOOLEAN, value_ok BOOLEAN, tp INTEGER, fp INTEGER, fn INTEGER,
     PRIMARY KEY (run_id, doc_id, field)
+);
+CREATE TABLE IF NOT EXISTS issues (
+    run_id VARCHAR, doc_id VARCHAR, field VARCHAR, rule VARCHAR, severity VARCHAR, detail VARCHAR
 );
 """
 
@@ -115,6 +119,65 @@ def score(con: duckdb.DuckDBPyConnection, run_id: str) -> int:
         scored = score_doc(con, doc_id, from_rows(fields))
         con.executemany(SCORE_ROW, [{"run_id": run_id, "doc_id": doc_id, **r} for r in scored])
     return len(by_doc)
+
+
+def validate(con: duckdb.DuckDBPyConnection, run_id: str) -> int:
+    """(Re)check one run from its stored predictions. No LLM call. Returns the number of issues."""
+    (parser,) = con.execute("SELECT parser FROM runs WHERE run_id = ?", [run_id]).fetchone()
+    rows = con.execute(
+        "SELECT doc_id, field, ok, answer FROM predictions WHERE run_id = ?", [run_id]
+    ).fetchall()
+    by_doc = defaultdict(list)
+    for doc_id, field, ok, answer in rows:
+        by_doc[doc_id].append((field, ok, answer))
+    con.execute("DELETE FROM issues WHERE run_id = ?", [run_id])
+    total = 0
+    for doc_id, fields in by_doc.items():
+        if not all(ok for _, ok, _ in fields):  # the stored fields are empty, not the real answer
+            issues = bad_schema("the answer did not fit the schema")
+        else:
+            pred = from_rows([(field, answer) for field, _, answer in fields])
+            issues = check_answer(pred, PARSERS[parser](con, doc_id))
+        new = [(run_id, doc_id, i.field, i.rule, i.severity, i.detail) for i in issues]
+        if new:  # DuckDB's executemany fails on an empty list
+            con.executemany("INSERT INTO issues VALUES (?, ?, ?, ?, ?, ?)", new)
+        total += len(new)
+    return total
+
+
+REVIEW = """
+WITH flagged AS (SELECT DISTINCT doc_id, field FROM issues WHERE run_id = $run_id),
+errors AS (SELECT DISTINCT doc_id, field FROM issues WHERE run_id = $run_id AND severity = 'error'),
+look AS (  -- from the gold labels: wrong, or right with the wrong quote
+    SELECT doc_id, field, fn > 0 AND fp = 0 AS missed FROM scores
+    WHERE run_id = $run_id AND (fp + fn > 0 OR (rule = 'presence' AND tp > 0 AND quote_ok IS FALSE))
+)
+SELECT
+    (SELECT count(*) FROM predictions WHERE run_id = $run_id),
+    (SELECT count(*) FROM errors),
+    (SELECT count(DISTINCT doc_id) FROM errors),
+    (SELECT count(*) FROM flagged),
+    (SELECT count(DISTINCT doc_id) FROM flagged),
+    (SELECT count(*) FROM look),
+    (SELECT count(*) FROM look WHERE missed),
+    (SELECT count(*) FROM flagged JOIN look USING (doc_id, field)),
+    (SELECT count(*) FROM flagged JOIN look USING (doc_id, field) WHERE missed)
+"""
+
+
+def review_report(con: duckdb.DuckDBPyConnection, run_id: str) -> None:
+    """Print the error rate, the review rate, and how many real problems the flags catch."""
+    n, err, err_docs, flags, flag_docs, look, missed, caught, caught_missed = con.execute(
+        REVIEW, {"run_id": run_id}
+    ).fetchone()
+    print(f"errors: {err} fields ({err / n:.1%}) in {err_docs} contracts")
+    print(f"needs review: {flags} fields ({flags / n:.1%}) in {flag_docs} contracts")
+    print(f"need a look (gold): {look} fields, {missed} of them missed")
+    print(f"caught: {caught} of {look}, and {caught_missed} of the {missed} missed")
+    rules = con.execute(
+        "SELECT rule, count(*) FROM issues WHERE run_id = ? GROUP BY rule ORDER BY 2 DESC", [run_id]
+    ).fetchall()
+    print("by rule:", ", ".join(f"{rule} {count}" for rule, count in rules))
 
 
 def todo(con: duckdb.DuckDBPyConnection, run_id: str, doc_ids: list[str]) -> list[str]:
@@ -203,6 +266,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     rescore.add_argument("run_id")
     show = sub.add_parser("report", help="print P/R per field and group, cost and latency")
     show.add_argument("run_id")
+    check = sub.add_parser("validate", help="check a stored run again and store the issues")
+    check.add_argument("run_id")
     return parser.parse_args(argv)
 
 
@@ -215,6 +280,10 @@ def main(argv: list[str] | None = None) -> None:
             return
         if args.command == "report":
             report(con, args.run_id)
+            return
+        if args.command == "validate":
+            print(f"stored {validate(con, args.run_id)} issues for run {args.run_id}")
+            review_report(con, args.run_id)
             return
         if args.resume:
             run_id = args.resume
@@ -243,6 +312,7 @@ def main(argv: list[str] | None = None) -> None:
         failed = run_docs(con, run_id, texts, model, version, args.concurrency)
         wall_s = time.perf_counter() - start
         n = score(con, run_id)
+        validate(con, run_id)
         print(f"done in {wall_s:.0f} s: {n} of {n_docs} docs scored, {failed} calls failed")
         if n < n_docs:
             print(f"finish it with: --resume {run_id}")

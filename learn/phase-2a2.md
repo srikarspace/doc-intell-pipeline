@@ -735,10 +735,14 @@ Here, we:
 3. Count `n` from `predictions`, so a run with no scores does not divide by 0.
 4. Join `flagged` and `look` to count what the flags catch.
 
-In `main`, call it after the `validate` print:
+In `main`, call it inside the `validate` block, between the print and the `return`
+(not in the `run` path, where there is no `args.run_id`):
 
 ```python
+        if args.command == "validate":
+            print(f"stored {validate(con, args.run_id)} issues for run {args.run_id}")
             review_report(con, args.run_id)
+            return
 ```
 
 Checkpoint, on all three stored runs:
