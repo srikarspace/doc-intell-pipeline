@@ -276,8 +276,9 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 1d | scoring review | error review by cause, scoring fixes + rescore (E1.2) | done |
 | 2 | 1d2 | prompt v2 | keep rule, prompt v2 for the weak fields (E1.3) | done |
 | 2 | 2a | validators + citations | content rules outside the schema, quote-in-source check | done |
-| 2 | 2a2 | needs-review rules | review rules, `issues` table, `validate` replay, review report, E2.0 | doc ready |
-| 2 | 2b | retry + trust experiments | self-correction loop, attempt log, E2.1 to E2.3 | planned |
+| 2 | 2a2 | needs-review rules | review rules, `issues` table, `validate` replay, review report, E2.0 | done |
+| 2 | 2b | retry loop | provider setting, repair retry loop, `attempts` table, `--retries` | doc ready |
+| 2 | 2b2 | trust experiments | keep rule, one dev run with retries, E2.1 to E2.3 | planned |
 | 2 | 3a | parsers | common `parse()` interface, pypdf, Docling, Qwen3-VL (~10 docs), disk cache | planned |
 | 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
 | 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
@@ -399,6 +400,14 @@ retries were worth the extra cost; why lawyers care more about recall on some fi
 > **2b Retry + trust experiments:** "On failure, send the errors back to the model, max 2
 > retries; record each attempt (attempt_no, errors, fixed?) in DuckDB. Then E2.1 validation only,
 > E2.2 + citation check, E2.3 + retry loop. One change at a time."
+
+> **2b2 Trust experiments (user decisions):** "Needs 2b. Experiments E2.1 to E2.3 on dev, one change
+> at a time, in one new run with `--retries 2` on the chosen provider. Its first answers are the
+> 'before', so the provider does not change the comparison. E2.1: what to do with a field that fails
+> validation (keep and flag, or blank it), replayed on the first answers. E2.2: the same, plus the
+> citation check. E2.3: the retry loop. The user writes a keep rule for retries before the run (lift,
+> TPs lost, extra cost). Report P/R/F1 with paired bootstrap, fields changed, TPs lost, retry cost per
+> contract, and the Phase 2 'done when' numbers. No schema or prompt v1 change. Dev only."
 
 ---
 

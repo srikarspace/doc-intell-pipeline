@@ -164,3 +164,30 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
     and a lower p95.
 - **Next step:** Decide on a v3 with only the cap_on_liability rule (new entry and rule), and which
   provider to use. Remove the temporary Parasail pin in `core/llm.py`. Then 2a.
+
+## E2.0: validation and review flags on stored runs
+- **Date:** 2026-11-07
+- **Score rules Hash:** `6ffdaa7` (same rules as E1.2). Validate code: `f200281`.
+- **run_id(s):** replay of 20261102-200003 (kept: V4 Flash, v1, Crusoe). No LLM calls, $0.
+- **Question / hypothesis:** How often do answers break a rule? How many real problems do review flags
+  catch, and at what review rate?
+- **Data:** dev, 52 contracts, 12 fields (624), CUAD .txt (clean).
+- **Setup:** errors: `quote_missing`, `found_no_quote`, `quote_not_found`, `found_no_value`,
+  `value_not_found`, `bad_date`, `bad_schema`. Warnings: `quote_gap` (MAX_GAP 60), `quote_no_words`,
+  `quote_off_topic` (topic word parts, 10 fields), `maybe_missed` (change_of_control, cap_on_liability,
+  renewal_term). Needs review = any field with at least one issue. No retries.
+- **Results:**
+
+  | Errors | Needs review | Need a look (gold) | Caught | Misses caught | `quote_missing` |
+  |---|---|---|---|---|---|
+  | 3 fields (0.5%), 2 contracts | 35 fields (5.6%), 27 contracts | 54 | 18 (33%) | 4 of 14 | 0 |
+
+  By rule: quote_off_topic 15, maybe_missed 10, quote_gap 6, found_no_value 3, quote_no_words 1.
+  18 of 35 flags (51%) point to a real problem.
+- **Limits:** the review rules were written from dev answers, so the catch is optimistic; test gives the
+  final number. "Need a look" uses gold labels, which have known errors (1d).
+- **Conclusion:** Errors are rare (3 fields, all `found_no_value`), so a retry in 2b can fix very little
+  on clean text. Flags are cheap per field (5.6%) but touch half the contracts (27 of 52). They catch a
+  third of the real problems; the other 36 look clean. No made-up quotes.
+- **Next step:** 2b, retry on errors. Before the first run: choose the provider (the Parasail pin in
+  `core/llm.py`).

@@ -159,8 +159,9 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Add rules for v2 to keep. Only when these rules pass against v1 we will keep v2.
     - Important learning is that we need to lockin the provider because when choosing different prompts each provider serve differently and that causes differences in results.
 
-### Phase 2: validators & citations, needs-review rules, retry experiments
+### Phase 2: observability, validators & citations, needs-review rules, retry experiments
 
+- check each answer in prod while it runs and record the result and retry if error
 - validators and code check
     - We need to check answers and return the list of issues that are easy to understand
     - We write rules to verify the LLMs response
@@ -171,6 +172,9 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - When a field gets need review flag. A person must take a look at the field.
     - We have to find review rate and rate catch on the results
     - Persist in Db so that someone can review
+
+- Retry and Trust experiment
+    - 
 
 ## Notes to remember
 - If notebook locked your db
