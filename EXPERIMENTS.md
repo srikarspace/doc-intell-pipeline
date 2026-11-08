@@ -191,3 +191,116 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   third of the real problems; the other 36 look clean. No made-up quotes.
 - **Next step:** 2b, retry on errors. Before the first run: choose the provider (the Parasail pin in
   `core/llm.py`).
+
+## E2.1: keep or blank a field with a validation error
+- **Date:** 2026-11-08
+- **Score rules Hash:** `6ffdaa7` (same rules as E1.2). Code: 2b2 tool, not committed yet (on `13771c0`).
+- **run_id(s):** 20261108-062221-first against 20261108-062221-first-blank-v. Parent 20261108-062221 (`--retries 2`,
+  Parasail). Evidence before the run: replays of 20261102-200003 (Crusoe), 20261105-213036 (Parasail v1).
+- **Question / hypothesis:** Does blanking fields with a validation error (`found_no_quote`,
+  `quote_not_found`, `found_no_value`, `value_not_found`, `bad_date`) raise F1? How many TPs does it
+  lose?
+- **Setup:** deepseek/deepseek-v4-flash on Parasail, prompt v1, first answers only. Replay, no LLM calls.
+- **Evidence before the run (2b2 Step 5):**
+
+  | Run | Keep: F1 (TP/FP/FN) | Blank validation |
+  |---|---|---|
+  | Crusoe 20261102-200003 | 0.9119 (290/36/20) | 0.9131 (289/34/21) |
+  | Parasail v1 20261105-213036 | 0.9071 (283/31/27) | 0.9082 (282/29/28) |
+
+  Blanking removes 2 FPs and loses 1 TP on each run (Pareteum `renewal_term`: a real clause with a
+  hidden `***` value).
+- **Policy (written before the run):** A, keep and flag. +0.001 is far inside the 0.012 noise, and a
+  blank hides a real clause that a flag would send to a person. It changes if: blanking lifts F1 by
+  more than 0.012 on the first answers, and loses no TP.
+- **Results:**
+
+  | Run | P | R | F1 | TP/FP/FN |
+  |---|---|---|---|---|
+  | first (keep) | 0.893 | 0.913 | 0.903 | 283/34/27 |
+  | first-blank-v | 0.895 | 0.903 | 0.899 | 280/33/30 |
+
+  Gap blank-v minus keep: -0.004 (-0.010 to 0.000). 4 fields blanked: 3 TPs lost (Pareteum
+  `renewal_term` and `cap_on_liability`, Sucampo `cap_on_liability`, all `found_no_value` on a real
+  clause), 1 FP removed (Pareteum `notice_period`).
+- **Conclusion:** keep and flag (A) stays. Against the line: F1 went down, not up by 0.012, and 3 TPs
+  were lost. Blanking a validation error hides more right answers than wrong ones.
+- **Next step:** E2.2.
+
+## E2.2: the same, plus the citation check
+- **Date:** 2026-11-08
+- **Score rules Hash:** `6ffdaa7` (same rules as E1.2). Code: as E2.1.
+- **run_id(s):** 20261108-062221-first against 20261108-062221-first-blank-vc. Parent 20261108-062221.
+- **Question / hypothesis:** Does also blanking fields with a citation error (`quote_missing`) raise F1?
+  Are the caught quotes made up, or right answers with a copy error?
+- **Setup:** as E2.1, plus `quote_missing` in the blanked rules.
+- **Evidence before the run (2b2 Step 5):** Crusoe has no citation errors (same as E2.1). Parasail v1:
+  0.9071 (283/31/27) -> 0.9047 (280/29/30). Both caught quotes were TPs with a copy error in the
+  contract text (Coral Gold `anti_assignment`: `thewritten`; Upjohn `cap_on_liability`). 0 made up.
+- **Policy (written before the run):** A, keep and flag. The same line as E2.1 changes it.
+- **Results:** first-blank-vc: P 0.894, R 0.897, F1 0.895 (278/33/32). Gap blank-vc minus keep: -0.007
+  (-0.015 to -0.002), a real loss. 6 fields blanked: 5 TPs lost, 1 FP removed.
+  `quote_missing` on the first answers: Coral Gold `anti_assignment` (TP) and Upjohn `cap_on_liability`
+  (TP). Both are right answers with a copy error against odd contract text (`thewritten`; `11⁄2` where the model wrote `1½`).
+  0 made up, same as on the Parasail v1 run.
+- **Conclusion:** keep and flag (A) stays. Blanking citation errors is the worst policy on clean text:
+  the citation check catches copy errors, not made-up quotes.
+- **Next step:** E2.3.
+
+## E2.3: the retry loop
+- **Date:** 2026-11-08
+- **Score rules Hash:** `6ffdaa7` (same rules as E1.2). Code: as E2.1.
+- **run_id(s):** 20261108-062221 (final) against 20261108-062221-first, policy A (`keep` row). All 56 calls on Parasail.
+  Other derived runs: 20261108-062221-first-blank-v, -first-blank-vc, -blank-v, -blank-vc.
+- **Question / hypothesis:** Do repair retries (max 2, errors sent back to the model) fix error fields
+  without losing right answers, at a small cost?
+- **Setup:** one dev run, 52 contracts, deepseek/deepseek-v4-flash, prompt v1, Parasail pinned,
+  `--retries 2`. Then `python -m docintel.evals.trust <run_id>`.
+- **Keep rule (written before the run):** keep `--retries 2` only if all of these are true, on the
+  `keep` row:
+  1. `lost` is 0.
+  2. Error fields (validation plus citation) go down by at least 1.
+  3. Final F1 is not lower than first F1.
+  4. Retries cost at most 20% of attempt 0.
+  5. 0 bad answers in the final answers.
+  If it passes, `--retries 2` becomes the default for later runs and the API. If it fails, the default
+  stays 0, and the loop stays in the code for Phase 3.
+- **Results:**
+
+  ```text
+             first: P     R    F1  final: P     R    F1  changed lost gained
+  keep          0.893 0.913 0.903     0.893 0.913 0.903        1    0      0
+  blank-v       0.895 0.903 0.899     0.895 0.903 0.899        1    0      0
+  blank-vc      0.894 0.897 0.895     0.894 0.900 0.897        1    0      1
+  error fields: validation 4 -> 4, citation 2 -> 1
+  retries: 4 of 52 contracts, 4 calls, 1 fixed
+  cost: first answers $0.1131, retries $0.0078 (7%), $0.0023 per contract
+  ```
+
+  Gap final minus first (keep): 0.000 (0.000 to 0.000). Run: 56 calls, $0.121, p50 15.5 s, p95 33.5 s,
+  0 bad answers.
+  - Fixed: Upjohn `cap_on_liability`. The retry shortened the quote to text that is in the contract.
+    It was a TP before and after, so F1 did not move.
+  - Not fixed, stopped after 1 retry by the no-progress stop: Coral Gold (`thewritten`), Pareteum (3
+    fields with `***` values), Sucampo `cap_on_liability`.
+  - This run's first answers against the E1.3 Parasail v1 run: -0.004 (-0.018 to +0.011), run noise.
+
+  Phase 2 "done when" numbers:
+
+  | Number | First answers | Final answers |
+  |---|---|---|
+  | Validation failure rate | 6 fields (1.0%) in 4 contracts | 5 fields (0.8%) in 3 contracts |
+  | Made-up quotes caught | 0 (2 `quote_missing`, both copy errors) | 0 (1 left: Coral Gold) |
+  | Retry lift (F1) | 0.903 | 0.903 (gap 0.000, 0.000 to 0.000) |
+  | Needs-review rate | 46 fields (7.4%) in 27 contracts | 45 fields (7.2%) in 26 contracts |
+
+  E2.0 (kept run, Crusoe): errors 0.5%, needs review 5.6%, 0 `quote_missing`.
+- **Limits:** dev only, 52 contracts, clean text. Errors are rare, so every count is small. The rules
+  were written from dev data. The one fix made a quote checkable, not more correct.
+- **Conclusion:** retries pass the keep rule, all 5 lines: 1 `lost` 0 (pass), 2 error fields 6 -> 5
+  (pass), 3 F1 0.903 -> 0.903 (pass), 4 retries 7% of attempt 0 (pass), 5 0 bad answers (pass).
+  So by the rule, `--retries 2` becomes the default. Honest size: 1 field of 624 changed, F1 did not
+  move, and it costs about $0.0002 per contract. Most errors on clean text cannot be fixed by the
+  model (redacted `***` values, broken words in the contract).
+- **Next step:** done: `--retries` default is now 2 in `evals/runner.py`. Then Phase 3, the same loop and trust
+  table on worse text, where errors should be more common.

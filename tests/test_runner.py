@@ -27,13 +27,13 @@ def result(parsed: ContractFields | None) -> LLMResult[ContractFields]:
 
 
 def test_rows_rebuild_the_same_answer():
-    rows = runner.to_rows("r1", "d1", result(PRED))
+    rows = runner.to_rows("r1", "d1", PRED)
     assert len(rows) == 12
     assert runner.from_rows([(field, answer) for _, _, field, _, _, answer in rows]) == PRED
 
 
 def test_bad_answer_becomes_12_empty_fields():
-    rows = runner.to_rows("r1", "d1", result(None))
+    rows = runner.to_rows("r1", "d1", None)
     assert {(ok, found) for _, _, _, ok, found, _ in rows} == {(False, False)}
     runner.from_rows([(field, answer) for _, _, field, _, _, answer in rows])  # still valid
 

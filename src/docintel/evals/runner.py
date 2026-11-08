@@ -6,14 +6,13 @@ import time
 import urllib.request
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
 import duckdb
 
 from docintel.core.config import get_settings
-from docintel.core.llm import LLMResult, log_call
+from docintel.core.llm import log_call
 from docintel.domain.extract.extract import build_messages
 from docintel.domain.extract.retry import Attempt, extract_with_retry, final_answer
 from docintel.domain.schema.fields import ContractFields, Names
@@ -95,12 +94,12 @@ def empty_answer(field: str) -> dict:
     return answer
 
 
-def to_rows(run_id: str, doc_id: str, result: LLMResult[ContractFields]) -> list[tuple]:
-    """12 rows for one contract. An answer that failed the schema gives 12 empty fields."""
-    ok = result.parsed is not None
+def to_rows(run_id: str, doc_id: str, pred: ContractFields | None) -> list[tuple]:
+    """12 rows for one contract. None (the answer failed the schema) gives 12 empty fields."""
+    ok = pred is not None
     rows = []
     for field in ContractFields.model_fields:
-        answer = getattr(result.parsed, field).model_dump() if ok else empty_answer(field)
+        answer = getattr(pred, field).model_dump() if ok else empty_answer(field)
         rows.append((run_id, doc_id, field, ok, answer["found"], json.dumps(answer)))
     return rows
 
@@ -256,13 +255,13 @@ def run_docs(
                 "INSERT INTO attempts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 attempt_rows(run_id, doc_id, attempts),
             )
-            final = replace(attempts[-1].result, parsed=final_answer(attempts))
+            final = final_answer(attempts)
             con.executemany(
                 "INSERT INTO predictions VALUES (?, ?, ?, ?, ?, ?)", to_rows(run_id, doc_id, final)
             )
             cost = sum(a.result.cost_usd or 0 for a in attempts)
             print(
-                f"[{i}/{len(futures)}] {doc_id[:40]}  ok={final.parsed is not None}"
+                f"[{i}/{len(futures)}] {doc_id[:40]}  ok={final is not None}"
                 f"  tries={len(attempts)}  ${cost:.4f}"
             )
     finally:
@@ -304,7 +303,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     run.add_argument("--concurrency", type=int, default=8, help="calls at the same time")
     run.add_argument("--resume", metavar="RUN_ID", help="finish a run that was stopped")
     run.add_argument("--yes", action="store_true", help="do not ask before spending money")
-    run.add_argument("--retries", type=int, choices=[0, 1, 2], default=0, help="repair retries")
+    retries_help = "repair retries (default 2, kept in E2.3)"
+    run.add_argument("--retries", type=int, choices=[0, 1, 2], default=2, help=retries_help)
     rescore = sub.add_parser("score", help="score a stored run again (no LLM calls)")
     rescore.add_argument("run_id")
     show = sub.add_parser("report", help="print P/R per field and group, cost and latency")

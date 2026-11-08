@@ -74,13 +74,7 @@ def _send(client, messages, schema, model, max_attempts, backoff_s):
                 model=model,
                 messages=messages,
                 response_format=response_format(schema),
-                extra_body={
-                    "provider": {
-                        "require_parameters": True,
-                        "order": ["parasail"],  # temporary pin for E1.3; remove after
-                        "allow_fallbacks": False,
-                    }
-                },
+                extra_body={"provider": provider_prefs()},
                 temperature=0,
             )
             return resp, attempt
