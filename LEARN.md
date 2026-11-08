@@ -179,6 +179,11 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - We should be able to stop when retry is not working.
     - Measure the cost and result of retry for observability
 
+### Phase 3: Parse PDFs
+
+- There are three ways to parse PDFs. pypdf(plan py library), OCR style(uses OCR library which pulls models locally and extracts) and use Vision models(takes the PDF images and extracts text)
+- 
+
 ## Notes to remember
 - If notebook locked your db
     - check `lsof data/docintel.duckdb`. Returns the PID where there is a connection.

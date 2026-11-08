@@ -205,9 +205,9 @@ by anchor instead of repeating them. The phase doc links in with
 |---|---|
 | Data | CUAD v1 (510 contracts, 41 categories, lawyer-labelled spans) |
 | Scope | 12 fields, 3 per group (final pick in Phase 0) |
-| LLM | OpenRouter, open-weight Qwen (Qwen3 text for extraction, Qwen3-VL for multimodal parse); `response_format: json_schema` + `require_parameters: true` |
+| LLM | OpenRouter, open-weight. Extraction: DeepSeek V4 Flash (kept in E1.1; text only). Multimodal parse: one vision LLM, chosen in 3a3 from DeepSeek V4.1 Flash and Kimi K2.6. `response_format: json_schema` + `require_parameters: true` |
 | Validation | Pydantic (always; provider schema enforcement is not guaranteed) |
-| Parsers | pypdf (naive, free) vs Docling (layout, local, free) vs Qwen3-VL (page images, paid) |
+| Parsers | pypdf (naive, free) vs Docling (layout, local, free) vs vision LLM (page images, paid) |
 | Store | DuckDB offline (contracts, labels, splits, runs, predictions, scores, cost, latency); Postgres (Neon) in prod (request log, spend) |
 | Tracing | Arize Phoenix (local in dev; hosted or self-hosted for prod) + JSON logs |
 | Serve | FastAPI, Docker, GCP Cloud Run; Next.js UI on Vercel; GitHub Actions CI with eval gate (prod bar in ../PLAN.md) |
@@ -280,7 +280,9 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 2b | retry loop | provider setting, repair retry loop, `attempts` table, `--retries` | done |
 | 2 | 2b2 | trust replay tool | first answers, blanking, derived runs, policy for failed fields before the run | doc ready |
 | 2 | 2b3 | trust run | keep rule for retries, one dev run with `--retries 2`, E2.1 to E2.3, Phase 2 numbers | doc ready |
-| 2 | 3a | parsers | common `parse()` interface, pypdf, Docling, Qwen3-VL (~10 docs), disk cache | planned |
+| 2 | 3a | parser interface | common `parse()` interface, pypdf, disk cache | doc ready |
+| 2 | 3a2 | Docling | trace Docling's pipeline, wrap it, measure on an 8 GB Mac | doc ready |
+| 2 | 3a3 | vision parser | page images, cost first, pilot of two vision models (~10 docs), E3.0 | doc ready |
 | 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
 | 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
 | 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
@@ -430,10 +432,24 @@ retries were worth the extra cost; why lawyers care more about recall on some fi
 for multimodal; why CER and F1 can disagree.
 
 > **3a Parsers:** "`src/docintel/domain/parse/` with a common interface `parse(pdf_path) ->
-> ParsedDoc(text, pages, cost_usd, latency_ms, parser_name)` for pypdf, Docling (local) and
-> Qwen3-VL via OpenRouter (page images, ~10 dev docs, capped pages, cost estimated first). Disk
+> ParsedDoc(text, pages, cost_usd, latency_ms, parser_name)` for pypdf, Docling (local) and a
+> vision LLM via OpenRouter (page images, ~10 dev docs, capped pages, cost estimated first). Disk
 > cache keyed by (parser, doc_id). Repo-reading practice: trace Docling's conversion pipeline
 > before wrapping it."
+
+> The 3a prompt did not fit one doc, so it is split in three. 3a is the interface, pypdf and the disk
+> cache. 3a2 and 3a3 are below.
+
+> **3a2 Docling (user decisions):** "Needs 3a. Repo-reading first: trace Docling's conversion pipeline
+> at a fixed tag, then wrap it behind the 3a interface. OCR, table structure and output format are user
+> decisions, from real output on one dev contract. Written for an 8 GB Mac: one 2-page contract first,
+> measure time and peak memory, one document at a time. Dev only."
+
+> **3a3 Vision parser (user decisions):** "Needs 3a. Page images to a vision LLM through `call_llm`,
+> cost estimated first, a page cap with no silent cutting. Prompt, DPI, page cap and the ~10 dev docs
+> are user decisions. Pilot DeepSeek V4.1 Flash and Kimi K2.6 on the same pages (the vision model cannot
+> be DeepSeek V4 Flash, which is text only); the user keeps one for 3b. E3.0 in `EXPERIMENTS.md`. CER and
+> F1 stay in 3b. Dev only."
 
 > **3b Scans + parser experiment (user decisions):** "A seeded scan degrader that turns ~10 dev
 > PDFs into image-only fake scans (rasterize, rotate, noise, blur, lower DPI), with a before/after

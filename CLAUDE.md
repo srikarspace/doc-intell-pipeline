@@ -22,7 +22,7 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 - Every experiment run: `run_id` in DuckDB + entry in `EXPERIMENTS.md`.
 
 ## Stack
-Python 3.12, uv, pytest, ruff, Jupyter · OpenRouter (open-weight Qwen3 / Qwen3-VL, `response_format: json_schema`, `require_parameters: true`) · Pydantic · pypdf / Docling / Qwen3-VL parsers · DuckDB (offline evals) · Postgres/Neon (prod log) · Arize Phoenix · FastAPI · Docker · GCP Cloud Run · Next.js on Vercel · GitHub Actions.
+Python 3.12, uv, pytest, ruff, Jupyter · OpenRouter (open-weight: DeepSeek V4 Flash for extraction, a vision LLM chosen in 3a3; `response_format: json_schema`, `require_parameters: true`) · Pydantic · pypdf / Docling / vision LLM parsers · DuckDB (offline evals) · Postgres/Neon (prod log) · Arize Phoenix · FastAPI · Docker · GCP Cloud Run · Next.js on Vercel · GitHub Actions.
 
 ## Layout
 Standard layout (see `PLAN.md`): `src/docintel/{core,domain,evals,api,db}` · `web/` · `evals/mini/` · `learn/` · `notebooks/` · `tests/` · `data/` (gitignored).

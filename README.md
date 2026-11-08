@@ -18,7 +18,7 @@ Built from **Project 1: Document intelligence pipeline** in [AI Engineer Project
 | 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) loader · [0c](./learn/phase-0c.md) explore · [0d](./learn/phase-0d.md) fields + split | done |
 | 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | done |
 | 2 trust layer | [2a](./learn/phase-2a.md) validators + citations · [2a2](./learn/phase-2a2.md) needs-review rules · [2b](./learn/phase-2b.md) retry loop · [2b2](./learn/phase-2b2.md) trust replay tool · [2b3](./learn/phase-2b3.md) trust run | done |
-| 3 parser comparison | pypdf, Docling, Qwen3-VL · scans | planned |
+| 3 parser comparison | pypdf, Docling, vision LLM (chosen in 3a3) · scans | planned |
 | 4 service | planner + API · observability · Docker, Cloud Run, CI · UI | planned |
 | 5 write-up | figures, README, mock interview | planned |
 
@@ -46,7 +46,7 @@ There are two notes for each part. `learn/phase-N.md` covers what the part build
 
 Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB.
 
-Planned additions: Docling and Qwen3-VL parsers, FastAPI, Phoenix, Docker, Cloud Run and Next.js.
+Planned additions: Docling and vision LLM parsers, FastAPI, Phoenix, Docker, Cloud Run and Next.js.
 
 ## Quickstart
 

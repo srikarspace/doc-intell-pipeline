@@ -22,6 +22,6 @@ Known gaps in the 3-week plan. Review after week 1 and fold the useful ones into
 
 - **Pace.** One part per day while new to Python; week 3 (GCP, Docker, CI, Next.js) has the most
   setup friction. If behind, cut 4d to a bare upload page; never cut evals.
-- **Small samples.** Qwen3-VL on ~10 docs shows the trade-off but is not a strong claim; say so in
+- **Small samples.** The vision LLM on ~10 docs shows the trade-off but is not a strong claim; say so in
   the README.
 - **Cost.** Estimate before every batch run; keep the credit limit on the OpenRouter key.
