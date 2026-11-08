@@ -188,7 +188,18 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - Quotes fail when the text doesn't match. 1st and 1 st look similar to use but quote check fails as it compares ['1st] vs ['1', 'st']
 - We would also like to cache data so that same PDF would not call LLM and use cache instead.
 - If not cached, we parse, store and return
-- pypdf missed lot of quotes after the parse(missed 80%) even though length of the text and words are same. Its because of word breaks or new likes are added by pypdf. Also it can't convert scanned pdfs.
+
+- pypdf
+    - pypdf missed lot of quotes after the parse(missed 80%) even though length of the text and words are same. Its because of word breaks or new likes are added by pypdf. Also it can't convert scanned pdfs.
+
+- Docling
+    - Docling is a pipeline of small local models. Each model in it does a specific thing and together they create a text page.
+    - OCR: Optical character recognition. A program that reads chars from an image using local models.
+    - We can enable and disable OCR in docling
+    - In docling if table mode is on then in our text we will be seeing table. If we are reading this text its good but if we are sending it to a LLM then the quotes might not match as the table border chars can be in the quotes and that breaks score. We should turn off table mode.
+    - Process: pre_process(read text layer) -> layout(find blocks) -> OCR(read letters) -> layout_post_process(clean blocks) -> table(rows and blocks) -> assemble(join the blocks)
+    - This is same as pypdf but its much slower may be when scanned pdfs where text is not available this will score better.
+
 - 
 
 ## Notes to remember
