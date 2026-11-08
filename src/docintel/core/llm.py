@@ -54,6 +54,15 @@ def _parse[T: BaseModel](schema: type[T], raw_text: str) -> tuple[T | None, str 
         return None, str(e)
 
 
+def provider_prefs() -> dict:
+    """OpenRouter's provider rules. A pinned provider has no backup, so runs never mix providers."""
+    prefs = {"require_parameters": True}
+    provider = get_settings().docintel_provider
+    if provider:
+        prefs |= {"order": [provider], "allow_fallbacks": False}
+    return prefs
+
+
 RETRYABLE = (openai.APIConnectionError, openai.RateLimitError)  # timeouts are connection errors
 
 

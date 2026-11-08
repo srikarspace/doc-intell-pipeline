@@ -6,6 +6,7 @@ import time
 import urllib.request
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +14,8 @@ import duckdb
 
 from docintel.core.config import get_settings
 from docintel.core.llm import LLMResult, log_call
-from docintel.domain.extract.extract import build_messages, extract
+from docintel.domain.extract.extract import build_messages
+from docintel.domain.extract.retry import Attempt, extract_with_retry, final_answer
 from docintel.domain.schema.fields import ContractFields, Names
 from docintel.domain.validate.rules import bad_schema, check_answer
 from docintel.evals.scorers import metrics, score_doc
@@ -40,6 +42,14 @@ CREATE TABLE IF NOT EXISTS scores (
 CREATE TABLE IF NOT EXISTS issues (
     run_id VARCHAR, doc_id VARCHAR, field VARCHAR, rule VARCHAR, severity VARCHAR, detail VARCHAR
 );
+CREATE TABLE IF NOT EXISTS attempts (
+    run_id VARCHAR, doc_id VARCHAR, attempt_no INTEGER, ok BOOLEAN,
+    errors JSON,    -- the error issues of this attempt, as "field:rule"
+    fixed BOOLEAN,  -- a repair retry with no errors left
+    cost_usd DOUBLE, latency_ms INTEGER, raw_text VARCHAR,
+    PRIMARY KEY (run_id, doc_id, attempt_no)
+);
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 0;
 """
 
 
@@ -98,6 +108,29 @@ def to_rows(run_id: str, doc_id: str, result: LLMResult[ContractFields]) -> list
 def from_rows(rows: list[tuple[str, str]]) -> ContractFields:
     """Rebuild one contract's answer from its (field, answer JSON) rows."""
     return ContractFields.model_validate({field: json.loads(answer) for field, answer in rows})
+
+
+def attempt_rows(run_id: str, doc_id: str, attempts: list[Attempt]) -> list[tuple]:
+    """One row per attempt, so cost and errors can be read per contract and per retry."""
+    rows = []
+    for a in attempts:
+        errors = [f"{i.field}:{i.rule}" for i in a.errors]
+        fixed = a.attempt_no > 0 and not errors
+        r = a.result
+        rows.append(
+            (
+                run_id,
+                doc_id,
+                a.attempt_no,
+                r.parsed is not None,
+                json.dumps(errors),
+                fixed,
+                r.cost_usd,
+                r.latency_ms,
+                r.raw_text,
+            )
+        )
+    return rows
 
 
 SCORE_ROW = (
@@ -194,6 +227,7 @@ def run_docs(
     model: str,
     prompt_version: str,
     concurrency: int,
+    max_retries: int = 0,
 ) -> int:
     """Extract many contracts at the same time. Returns how many calls failed.
 
@@ -201,7 +235,9 @@ def run_docs(
     """
     pool = ThreadPoolExecutor(max_workers=concurrency)
     futures = {
-        pool.submit(extract, text, model, prompt_version=prompt_version): doc_id
+        pool.submit(
+            extract_with_retry, text, model, prompt_version=prompt_version, max_retries=max_retries
+        ): doc_id
         for doc_id, text in texts.items()
     }
     failed = 0
@@ -209,19 +245,25 @@ def run_docs(
         for i, future in enumerate(as_completed(futures), start=1):
             doc_id = futures[future]
             try:
-                result = future.result()
+                attempts = future.result()
             except Exception as e:  # still failing after the retries, or a 400 error
                 failed += 1
                 print(f"[{i}/{len(futures)}] {doc_id[:40]}  FAILED {type(e).__name__}: {e}")
                 continue
-            log_call(con, result, "ContractFields", run_id)
+            for a in attempts:  # every call is logged, retries too
+                log_call(con, a.result, "ContractFields", run_id)
             con.executemany(
-                "INSERT INTO predictions VALUES (?, ?, ?, ?, ?, ?)",
-                to_rows(run_id, doc_id, result),
+                "INSERT INTO attempts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                attempt_rows(run_id, doc_id, attempts),
             )
+            final = replace(attempts[-1].result, parsed=final_answer(attempts))
+            con.executemany(
+                "INSERT INTO predictions VALUES (?, ?, ?, ?, ?, ?)", to_rows(run_id, doc_id, final)
+            )
+            cost = sum(a.result.cost_usd or 0 for a in attempts)
             print(
-                f"[{i}/{len(futures)}] {doc_id[:40]}  ok={result.parsed is not None}"
-                f"  ${result.cost_usd or 0:.4f}  {result.latency_ms / 1000:.1f} s"
+                f"[{i}/{len(futures)}] {doc_id[:40]}  ok={final.parsed is not None}"
+                f"  tries={len(attempts)}  ${cost:.4f}"
             )
     finally:
         pool.shutdown(cancel_futures=True)  # on Ctrl-C: drop the calls that have not started
@@ -262,6 +304,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     run.add_argument("--concurrency", type=int, default=8, help="calls at the same time")
     run.add_argument("--resume", metavar="RUN_ID", help="finish a run that was stopped")
     run.add_argument("--yes", action="store_true", help="do not ask before spending money")
+    run.add_argument("--retries", type=int, choices=[0, 1, 2], default=0, help="repair retries")
     rescore = sub.add_parser("score", help="score a stored run again (no LLM calls)")
     rescore.add_argument("run_id")
     show = sub.add_parser("report", help="print P/R per field and group, cost and latency")
@@ -287,13 +330,15 @@ def main(argv: list[str] | None = None) -> None:
             return
         if args.resume:
             run_id = args.resume
-            split, parser, model, version, n_docs = con.execute(
-                "SELECT split, parser, model, prompt_version, n_docs FROM runs WHERE run_id = ?",
+            split, parser, model, version, n_docs, retries = con.execute(
+                "SELECT split, parser, model, prompt_version, n_docs, max_retries FROM runs "
+                "WHERE run_id = ?",
                 [run_id],
             ).fetchone()
         else:
             run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
             split, parser, version = args.split, args.parser, args.prompt_version
+            retries = args.retries
             model = args.model or get_settings().docintel_model
             n_docs = len(docs_for(con, split)[: args.limit])
         doc_ids = todo(con, run_id, docs_for(con, split)[:n_docs])
@@ -305,11 +350,11 @@ def main(argv: list[str] | None = None) -> None:
         if not args.resume:
             con.execute(
                 "INSERT INTO runs (run_id, split, parser, model, prompt_version, n_docs, "
-                "est_cost_usd) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [run_id, split, parser, model, version, n_docs, cost],
+                "est_cost_usd, max_retries) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [run_id, split, parser, model, version, n_docs, cost, retries],
             )
         start = time.perf_counter()
-        failed = run_docs(con, run_id, texts, model, version, args.concurrency)
+        failed = run_docs(con, run_id, texts, model, version, args.concurrency, retries)
         wall_s = time.perf_counter() - start
         n = score(con, run_id)
         validate(con, run_id)

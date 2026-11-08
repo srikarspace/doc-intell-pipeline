@@ -173,8 +173,11 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - We have to find review rate and rate catch on the results
     - Persist in Db so that someone can review
 
-- Retry and Trust experiment
-    - 
+- Retry
+    - Retry when there is an error or network issue
+    - Retry should have a repair prompt for errors only. The other which have succeeded should not need to be extracted during retry to save cost.
+    - We should be able to stop when retry is not working.
+    - Measure the cost and result of retry for observability
 
 ## Notes to remember
 - If notebook locked your db

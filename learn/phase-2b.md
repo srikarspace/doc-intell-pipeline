@@ -555,7 +555,9 @@ Here, we:
 3. Add `max_retries` to the existing `runs` table. `CREATE TABLE IF NOT EXISTS` does nothing to a table
    that exists, so a new column needs `ALTER`. Old runs get 0.
 
-Update the imports at the top of the same file:
+Update the imports at the top of the same file. Put each line in its place in the sorted list:
+`dataclasses` goes with the standard library imports (above `datetime`), and `retry` goes right after
+`extract.extract`. `make lint` fails on imports out of order.
 
 ```python
 from dataclasses import replace
@@ -597,9 +599,16 @@ In `run_docs`, add `max_retries: int = 0` as the last argument. Then submit the 
     }
 ```
 
-And replace the body after `future.result()` (rename `result` to `attempts` there):
+Then rename `result` to `attempts` in the `try`. Keep the `except` block as it is: a Python `try`
+needs its `except`, and a crashed contract must still be counted. Replace only what comes after it:
 
 ```python
+            try:
+                attempts = future.result()
+            except Exception as e:  # still failing after the retries, or a 400 error
+                failed += 1
+                print(f"[{i}/{len(futures)}] {doc_id[:40]}  FAILED {type(e).__name__}: {e}")
+                continue
             for a in attempts:  # every call is logged, retries too
                 log_call(con, a.result, "ContractFields", run_id)
             con.executemany(

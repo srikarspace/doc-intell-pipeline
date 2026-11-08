@@ -1,6 +1,7 @@
 """Runner rules with a fake extract. No network, no key, no CUAD files."""
 
 from docintel.core.llm import LLMResult
+from docintel.domain.extract.retry import Attempt
 from docintel.domain.schema.fields import ContractFields
 from docintel.evals import runner
 from docintel.evals.store import connect
@@ -38,12 +39,12 @@ def test_bad_answer_becomes_12_empty_fields():
 
 
 def test_resume_skips_done_docs_and_retries_crashed_ones(monkeypatch):
-    def fake_extract(text, model, *, prompt_version):
+    def fake_extract(text, model, *, prompt_version, max_retries):
         if text == "crash":
             raise TimeoutError("network down")
-        return result(PRED)
+        return [Attempt(0, result(PRED), [])]
 
-    monkeypatch.setattr(runner, "extract", fake_extract)
+    monkeypatch.setattr(runner, "extract_with_retry", fake_extract)
     texts = {"d1": "ok", "d2": "crash", "d3": "ok"}
     with connect(":memory:") as con:
         con.execute(runner.TABLES)

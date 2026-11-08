@@ -11,7 +11,8 @@ class Settings(BaseSettings):
 
     openrouter_api_key: SecretStr
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    docintel_model: str = "qwen/qwen3-235b-a22b-2507"
+    docintel_model: str = "deepseek/deepseek-v4-flash"
+    docintel_provider: str | None = "parasail"
     llm_timeout_s: float = 120.0
     llm_max_attempts: int = 4  # 1 try + 3 retries, only for network errors and 429
 
