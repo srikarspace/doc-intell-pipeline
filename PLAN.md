@@ -282,7 +282,7 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 2b3 | trust run | keep rule for retries, one dev run with `--retries 2`, E2.1 to E2.3, Phase 2 numbers | doc ready |
 | 2 | 3a | parser interface | common `parse()` interface, pypdf, disk cache | doc ready |
 | 2 | 3a2 | Docling | trace Docling's pipeline, wrap it, measure on an 8 GB Mac | doc ready |
-| 2 | 3a3 | vision parser | page images, cost first, pilot of two vision models (~10 docs), E3.0 | doc ready |
+| 2 | 3a3 | vision parser | page images, token limit, budget, cost first, pilot of two vision models, E3.0 | doc ready |
 | 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
 | 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
 | 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
