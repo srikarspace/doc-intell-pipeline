@@ -64,7 +64,7 @@ def cuad_txt(con: duckdb.DuckDBPyConnection, doc_id: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-PARSERS = {"cuad_txt": cuad_txt}  # 3a adds pypdf, Docling and Qwen3-VL
+PARSERS = {"cuad_txt": cuad_txt}  # 3b adds the parsers from 3a
 CHARS_PER_TOKEN = 4.0  # 1b measured about 4.6; a smaller number makes the guess a little high
 OUTPUT_TOKENS = 1000  # per contract; the 1b answer used 697
 

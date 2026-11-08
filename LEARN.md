@@ -182,6 +182,13 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 ### Phase 3: Parse PDFs
 
 - There are three ways to parse PDFs. pypdf(plan py library), OCR style(uses OCR library which pulls models locally and extracts) and use Vision models(takes the PDF images and extracts text)
+- We are testing multiple parsers. We need to make sure they all return same shape.
+- We check the quality, cost and time and decide which one to choose.
+- There will be empty pages so we should not worry when there is no text in a page. 
+- Quotes fail when the text doesn't match. 1st and 1 st look similar to use but quote check fails as it compares ['1st] vs ['1', 'st']
+- We would also like to cache data so that same PDF would not call LLM and use cache instead.
+- If not cached, we parse, store and return
+- pypdf missed lot of quotes after the parse(missed 80%) even though length of the text and words are same. Its because of word breaks or new likes are added by pypdf. Also it can't convert scanned pdfs.
 - 
 
 ## Notes to remember
