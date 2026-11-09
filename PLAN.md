@@ -283,7 +283,9 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 3a | parser interface | common `parse()` interface, pypdf, disk cache | doc ready |
 | 2 | 3a2 | Docling | trace Docling's pipeline, wrap it, measure on an 8 GB Mac | doc ready |
 | 2 | 3a3 | vision parser | page images, token limit, budget, cost first, pilot of two vision models, E3.0 | doc ready |
-| 2 | 3b | scans + parser experiment | scan degrader, CER, quality vs cost per parser, E3 | planned |
+| 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | doc ready |
+| 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | doc ready |
+| 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | doc ready |
 | 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
 | 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
 | 3 | 4c | ship | Docker, Cloud Run, GitHub Actions with eval gate on `evals/mini/` | planned |
@@ -456,6 +458,19 @@ for multimodal; why CER and F1 can disagree.
 > of one page. CER vs CUAD's .txt. Experiment design is a user decision (docs, metric that
 > decides 'better', which costs count). Run each parser through the Phase 2 pipeline on dev.
 > Charts: F1 vs cost per doc per parser x condition. E3."
+
+> The 3b prompt did not fit one doc, so it is split in three. 3b is the degrader and CER. 3b2 and 3b3 are
+> below.
+
+> **3b2 Experiment design + wiring (user decisions):** "Needs 3b. Docs, the metric that decides 'better', which
+> costs count, and a keep rule written and committed before any run, with the noise floor from stored runs as
+> evidence. Docling OCR as its own parser name (engine is a user decision). A frozen doc set, a paid parse stage
+> with cost first, and a run stage that reads only from the cache. No paid calls. Dev only."
+
+> **3b3 Parser experiment (user decisions):** "Needs 3b2, with its keep rule committed. Free cells first, then the
+> paid vision cells with a stop rule, then the Phase 2 pipeline on every cell and on `cuad_txt` for the same docs.
+> One compare table, paired bootstrap, the chart of F1 against cost per doc, and the rule applied line by line. E3.
+> Dev only."
 
 ---
 
