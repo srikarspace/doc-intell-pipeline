@@ -24,6 +24,8 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
         - Precision = 6 / 8 = 75%. Of the things it said, how many were true?
         - Recall = 6 / 10 = 60%. Of the things it should find, how many did it find?
     - Why the exam must stay fixed. You change the prompt, run again, and the grade goes from 60% to 80%. Same exam, so the prompt change caused the jump.
+    - F1 score is a measure of the harmonic mean of precision and recall. Used for binary and multi-class classification and LLM evaluation, the F1 score integrates precision and recall into a single metric to gain a better understanding of model performance.
+    - F-score can be modified into F0.5, F1, and F2 based on the measure of weightage given to precision over recall depending on your use case.
 
 #### Context window
 - Context length check is important because based on it we can decide what model we need to choose and if the input context is too big we can chunk the context. Apart from that we can estimate the cost as well. We use char length / 4 as tokens size of the file.
@@ -206,7 +208,13 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Here the modal charges money for every page and it doesn't stop. It charged tokens for empty page as well(wrote 130k tokens for empty pages).
     - Two things save money. 1. Max token output. 2. Max budget. PS: Model changes for hidden thinking as well in order to generate output tokens.
     - One call per page not per document as budget and token check can happen often.
-    - 
+
+- We have two types of pdfs. One with text in it and another the scanned pdf doc with text. PDFs with text looks like Docling is best for it while they can't get text from scanned pdf pages as there is 0 text in them. So for that we can use vision models.
+- For testing we can create our own fake scans(add blur, noise, pixels). No text layer. We damage it and compare how our agent works against correct text.
+- CER(Character error rate): Edit distance divided by true text. Ex: 1/4 = 0.25. It tells if the text was read correctly. 
+- We need CER and F1 to explain the model output.
+- For a real CER comparison we need to clean the text extracted by the library/model.
+- Even with low CER the quotes can not match because of small errors at the places that matter.
 
 ## Notes to remember
 - If notebook locked your db

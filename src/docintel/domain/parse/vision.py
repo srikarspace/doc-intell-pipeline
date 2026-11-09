@@ -56,6 +56,7 @@ class Budget:
     def add(self, cost_usd: float) -> None:
         self.spent += cost_usd
 
+
 def page_images(pdf_path: Path, dpi: int = DPI) -> list[str]:
     """One PNG data URL per page. Refuses a document over MAX_PAGES."""
     pdf = pdfium.PdfDocument(pdf_path)
@@ -76,6 +77,7 @@ def page_messages(image_url: str) -> list[dict]:
         {"type": "image_url", "image_url": {"url": image_url}},
     ]
     return [{"role": "user", "content": content}]
+
 
 def make_vision_parser(
     parser_name: str,

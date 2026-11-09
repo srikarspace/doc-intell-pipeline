@@ -44,6 +44,7 @@ def page_costs(parser_name: str) -> tuple[float, float]:
     usual = tokens_in * in_price + tokens_out * out_price
     return usual, tokens_in * in_price + MAX_OUTPUT_TOKENS * out_price
 
+
 def pick_docs(con, per_band: int) -> list[tuple]:
     """`per_band` dev contracts from each third of the lengths, at most MAX_PAGES pages."""
     return con.execute(
@@ -60,6 +61,7 @@ def pick_docs(con, per_band: int) -> list[tuple]:
         """,
         [MAX_PAGES, per_band],
     ).fetchall()
+
 
 def report_row(name: str, parsed: list[ParsedDoc], docs: list[tuple], spans: dict) -> str:
     n_pages = sum(len(d.pages) for d in parsed)
