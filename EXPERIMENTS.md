@@ -304,3 +304,29 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   model (redacted `***` values, broken words in the contract).
 - **Next step:** done: `--retries` default is now 2 in `evals/runner.py`. Then Phase 3, the same loop and trust
   table on worse text, where errors should be more common.
+
+## E3.0: vision model pilot
+- **Date:** 2026-11-08
+- **run_id(s):** pilot-20261108-210053 (3 docs), pilot-20261108-212103 (6 more docs; the first 3 came from the
+  cache). Calls are in `llm_calls`.
+- **Question / hypothesis:** Does the DeepSeek vision model read our contract pages well enough for its cost?
+- **Data:** dev, 9 contracts, 69 pages (`--per-band 3`: 3 from each third of the lengths, at most 20 pages each),
+  PDFs with a text layer. No scans yet.
+- **Setup:** deepseek/deepseek-v4.1-flash-1017 on Parasail. One call per page, 150 DPI,
+  grayscale, page cap 20, token limit 12,000, the copy prompt in `domain/parse/vision.py`. Budgets: $1.00 and $0.30.
+  Free baselines: pypdf, and Docling with OCR and tables off.
+- **Keep rule (written before the run):** none was written before the run. <user: write the rule, and say it came
+  after the run>
+- **Results:**
+
+  | Parser | Docs | Pages | Ratio | Quotes found | Cost | s/page |
+  |---|---|---|---|---|---|---|
+  | pypdf | 9 | 69 | 0.999 | 156/158 | $0 | 0.01 |
+  | docling | 9 | 69 | 0.991 | 157/158 | $0 | 1.09 |
+  | deepseek_vl | 9 | 69 | 0.994 | 153/158 | $0.2108 | 8.66 |
+
+  - DeepSeek: 69 of 69 pages OK, $0.0031 per page, largest output 7,028 tokens.
+- **Limits:** Few pages, one run each, and PDFs with a text layer, where copying the text is expected to win. The gap
+  is 4 quotes of 158, too small to rank quality.
+- **Conclusion:** <user: the result against the rule>
+- **Next step:** 3b, fake scans and the full parser comparison, with Docling OCR on.

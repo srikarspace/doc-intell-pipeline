@@ -66,8 +66,9 @@ def provider_prefs() -> dict:
 RETRYABLE = (openai.APIConnectionError, openai.RateLimitError)  # timeouts are connection errors
 
 
-def _send(client, messages, schema, model, max_attempts, backoff_s):
+def _send(client, messages, schema, model, max_attempts, backoff_s, max_tokens=None):
     """One request, tried again only on RETRYABLE errors. Returns (response, attempts)."""
+    limit = {"max_tokens": max_tokens} if max_tokens else {}
     for attempt in range(1, max_attempts + 1):
         try:
             resp = client.chat.completions.create(
@@ -76,6 +77,7 @@ def _send(client, messages, schema, model, max_attempts, backoff_s):
                 response_format=response_format(schema),
                 extra_body={"provider": provider_prefs()},
                 temperature=0,
+                **limit,
             )
             return resp, attempt
         except RETRYABLE:
@@ -127,6 +129,7 @@ def call_llm[T: BaseModel](
     model: str | None = None,
     client: OpenAI | None = None,
     backoff_s: float = 1.0,
+    max_tokens: int | None = None,
 ) -> LLMResult[T]:
     """Send messages, ask for JSON that fits `schema`, check it with Pydantic, log the call."""
     s = get_settings()
@@ -134,7 +137,9 @@ def call_llm[T: BaseModel](
     client = client or make_client()
 
     start = time.perf_counter()
-    resp, attempts = _send(client, messages, schema, model, s.llm_max_attempts, backoff_s)
+    resp, attempts = _send(
+        client, messages, schema, model, s.llm_max_attempts, backoff_s, max_tokens
+    )
     latency_ms = round((time.perf_counter() - start) * 1000)
 
     raw_text = resp.choices[0].message.content or ""

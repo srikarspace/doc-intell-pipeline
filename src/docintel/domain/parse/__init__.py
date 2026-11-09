@@ -6,8 +6,13 @@ from docintel.domain.parse.base import ParsedDoc, Parser
 from docintel.domain.parse.cache import cached_parse
 from docintel.domain.parse.docling_parser import parse_docling
 from docintel.domain.parse.pypdf_parser import parse_pypdf
+from docintel.domain.parse.vision import MODELS, make_vision_parser
 
-PARSERS: dict[str, Parser] = {"pypdf": parse_pypdf, "docling": parse_docling}
+PARSERS: dict[str, Parser] = {
+    "pypdf": parse_pypdf,
+    "docling": parse_docling,
+    **{name: make_vision_parser(name) for name in MODELS},
+}
 
 
 def parse_doc(parser_name: str, doc_id: str, pdf_path: Path | str) -> ParsedDoc:

@@ -200,7 +200,13 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
     - Process: pre_process(read text layer) -> layout(find blocks) -> OCR(read letters) -> layout_post_process(clean blocks) -> table(rows and blocks) -> assemble(join the blocks)
     - This is same as pypdf but its much slower may be when scanned pdfs where text is not available this will score better.
 
-- 
+- Vision(using vision models or Multi model models)
+    - DPI: Dots per inch. Measures how sharp a page is. Ex: 150 DPI makes the page 1275 pixels wide.
+    - Data URL: the whole file written as text inside a string. Ex: data:image/png;base64,iVBOR....
+    - Here the modal charges money for every page and it doesn't stop. It charged tokens for empty page as well(wrote 130k tokens for empty pages).
+    - Two things save money. 1. Max token output. 2. Max budget. PS: Model changes for hidden thinking as well in order to generate output tokens.
+    - One call per page not per document as budget and token check can happen often.
+    - 
 
 ## Notes to remember
 - If notebook locked your db
