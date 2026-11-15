@@ -278,14 +278,14 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 2a | validators + citations | content rules outside the schema, quote-in-source check | done |
 | 2 | 2a2 | needs-review rules | review rules, `issues` table, `validate` replay, review report, E2.0 | done |
 | 2 | 2b | retry loop | provider setting, repair retry loop, `attempts` table, `--retries` | done |
-| 2 | 2b2 | trust replay tool | first answers, blanking, derived runs, policy for failed fields before the run | doc ready |
-| 2 | 2b3 | trust run | keep rule for retries, one dev run with `--retries 2`, E2.1 to E2.3, Phase 2 numbers | doc ready |
-| 2 | 3a | parser interface | common `parse()` interface, pypdf, disk cache | doc ready |
-| 2 | 3a2 | Docling | trace Docling's pipeline, wrap it, measure on an 8 GB Mac | doc ready |
-| 2 | 3a3 | vision parser | page images, token limit, budget, cost first, pilot of two vision models, E3.0 | doc ready |
-| 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | doc ready |
-| 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | doc ready |
-| 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | doc ready |
+| 2 | 2b2 | trust replay tool | first answers, blanking, derived runs, policy for failed fields before the run | done |
+| 2 | 2b3 | trust run | keep rule for retries, one dev run with `--retries 2`, E2.1 to E2.3, Phase 2 numbers | done |
+| 2 | 3a | parser interface | common `parse()` interface, pypdf, disk cache | done |
+| 2 | 3a2 | Docling | trace Docling's pipeline, wrap it, measure on an 8 GB Mac | done |
+| 2 | 3a3 | vision parser | page images, token limit, budget, cost first, pilot of two vision models, E3.0 | done |
+| 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | done |
+| 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | done |
+| 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
 | 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
 | 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
 | 3 | 4c | ship | Docker, Cloud Run, GitHub Actions with eval gate on `evals/mini/` | planned |

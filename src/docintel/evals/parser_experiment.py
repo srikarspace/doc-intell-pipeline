@@ -6,6 +6,7 @@ from pathlib import Path
 
 import duckdb
 
+from docintel.core.config import get_settings
 from docintel.domain.parse import PARSERS
 from docintel.domain.parse.base import ParsedDoc
 from docintel.domain.parse.cache import cache_path, cached_parse
@@ -15,6 +16,7 @@ from docintel.domain.validate.citations import quote_status, words
 from docintel.evals.cer import cer
 from docintel.evals.parse_pilot import page_costs, pick_docs
 from docintel.evals.runner import CELLS, TABLES
+from docintel.evals.scorers import metrics
 from docintel.evals.store import connect
 
 SET_NAME = "e3"
@@ -143,6 +145,68 @@ def text_report(con: duckdb.DuckDBPyConnection, docs: list[tuple]) -> None:
             )
 
 
+LATEST = """
+SELECT parser, arg_max(run_id, created_at) FROM runs
+WHERE split = ? AND model = ? AND prompt_version = 'v1' GROUP BY parser
+"""
+EXTRACT_COST = "SELECT coalesce(sum(cost_usd), 0) FROM llm_calls WHERE run_id = ?"
+FLAGS = """
+SELECT count(DISTINCT (doc_id, field)),
+    count(DISTINCT (doc_id, field)) FILTER (WHERE severity = 'error')
+FROM issues WHERE run_id = ?
+"""
+
+
+def compare_rows(con: duckdb.DuckDBPyConnection, docs: list[tuple], model: str) -> list[dict]:
+    """One row per cell: quality, cost per doc, speed. Uses the newest run of each cell."""
+    runs = dict(con.execute(LATEST, [SET_NAME, model]).fetchall())
+    spans = all_spans(con, docs)
+    rows = []
+    for cell in ["cuad_txt", *CELLS]:
+        if cell not in runs:
+            continue
+        run_id = runs[cell]
+        reference = {"cer": 0.0, "parse_usd": 0.0, "s_page": 0.0}
+        stats = reference if cell == "cuad_txt" else cell_stats(cell, docs, spans)
+        if stats is None:  # never report a cost of 0 for text that we cannot find
+            raise SystemExit(f"{cell}: some docs are not parsed (run from the project folder)")
+        (extract,) = con.execute(EXTRACT_COST, [run_id]).fetchone()
+        review, errors = con.execute(FLAGS, [run_id]).fetchone()
+        m = metrics(con, run_id)[-1]  # the last row is all fields
+        n_fields = len(docs) * 12
+        rows.append(
+            {
+                "cell": cell,
+                "run_id": run_id,
+                "p": m["precision"],
+                "r": m["recall"],
+                "f1": m["f1"],
+                "cer": stats["cer"],
+                "parse_usd": stats["parse_usd"],
+                "extract_usd": extract / len(docs),
+                "total_usd": stats["parse_usd"] + extract / len(docs),
+                "s_page": stats["s_page"],
+                "review": review / n_fields,
+                "errors": errors,
+            }
+        )
+    return rows
+
+
+def print_compare(rows: list[dict]) -> None:
+    print(
+        f"{'cell':20} {'P':>5} {'R':>5} {'F1':>5} {'CER':>6} {'parse$':>8} {'extr$':>8} "
+        f"{'total$':>8} {'s/page':>7} {'review':>7} {'errors':>6}"
+    )
+    for r in rows:
+        p, recall, f1 = (0.0 if r[k] is None else r[k] for k in ("p", "r", "f1"))
+        print(
+            f"{r['cell']:20} {p:5.2f} {recall:5.2f} {f1:5.2f} {r['cer']:6.3f} "
+            f"{r['parse_usd']:8.4f} {r['extract_usd']:8.4f} {r['total_usd']:8.4f} "
+            f"{r['s_page']:7.2f} {r['review']:7.1%} {r['errors']:6}"
+        )
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="python -m docintel.evals.parser_experiment")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -155,6 +219,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--limit", type=int, help="only the N shortest docs")
     p.add_argument("--yes", action="store_true")
     t = sub.add_parser("text", help="CER, quotes, cost and speed per cell")
+    sub.add_parser("compare", help="quality against cost for every cell that has a run")
     t.add_argument("--limit", type=int)
     return ap.parse_args(argv)
 
@@ -170,6 +235,9 @@ def main(argv: list[str] | None = None) -> None:
         docs = frozen_docs(con, getattr(args, "limit", None))
         if args.command == "text":
             text_report(con, docs)
+            return
+        if args.command == "compare":
+            print_compare(compare_rows(con, docs, get_settings().docintel_model))
             return
     # the DuckDB file is closed here, so the parsers can open it
     if args.command == "scans":

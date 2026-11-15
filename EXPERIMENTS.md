@@ -306,20 +306,29 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   table on worse text, where errors should be more common.
 
 ## E3: parsers on clean PDFs and fake scans
-- **Date:** pilot 2026-11-08 (3a3). Design 2026-11-14, written before any main run.
-- **run_id(s):** pilot: pilot-20261108-210053 (3 docs), pilot-20261108-212103 (6 more docs; the first 3 came from
-  the cache). Calls are in `llm_calls`. Main runs: none yet (3b3).
+- **Date:** pilot 2026-11-08 (3a3). Design and runs 2026-11-14.
+- **Commits:** the keep rule is in `977625d` ("E3 setup"), before the first paid parse.
+- **run_id(s):**
+  - Pilot, clean vision: pilot-20261108-210053, pilot-20261108-212103.
+  - Free parse: e3-parse-20261114-202557. Paid parse: mild e3-parse-20261114-204635. Heavy
+    e3-parse-20261114-205916 (stopped), e3-parse-20261114-211015 (stopped on the last doc), e3-parse-20261114-212620
+    (finished).
+  - Extraction: one run per cell, in the results table.
 - **Question / hypothesis:** On scans, is vision worth paying for, or is free OCR good enough? The pilot asked first:
   does the DeepSeek vision model read our contract pages well enough for its cost?
 - **Data:** set `e3` (frozen, `freeze --per-band 3`): the 9 dev docs of the pilot, 69 pages, 158 label quotes. 3 docs
-  from each third of the lengths, at most 20 pages each. Clean vision is already paid for. The cost is small, and it
-  is a small test.
+  from each third of the lengths, at most 20 pages each. Conditions: clean, mild, heavy. Seed 0.
 - **Setup:**
+  - Extraction: deepseek/deepseek-v4-flash, prompt v1, `--retries 2`, Parasail (every call).
   - Vision (`deepseek_vl`): deepseek/deepseek-v4.1-flash-1017 on Parasail. One call per page, 150 DPI, grayscale,
-    page cap 20, token limit 12,000, the copy prompt in `domain/parse/vision.py`.
+    page cap 20, token limit 12,000, the copy prompt in `domain/parse/vision.py`. The last heavy parse (El Pollo)
+    ran with a 32,000 limit; see the failed pages below.
   - Docling OCR (`docling_ocr`): RapidOCR with the torch backend, pinned. It works here and in the Docker image.
     Pinning it means the result does not depend on what else is installed. Tables off.
   - Free baselines: `pypdf`, and `docling` with OCR and tables off.
+  - Damage (`domain/parse/scan.py`): mild 150 DPI, turn up to 0.5°, blur 0.5, noise 8. Heavy 100 DPI, turn up to
+    1.5°, blur 0.8, noise 20.
+  - CER level: `marks` (Unicode forms, spaces, capital letters and Markdown marks removed).
 - **Deciding metric:** F1 on all 12 fields. It measures what the product returns. CER is only used to explain
   results.
 - **Costs that count:** parse plus extraction plus retries, per contract. Time per page is a separate column, and it
@@ -332,8 +341,42 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   F1 by about 0.014.
 - **Keep rule (written before the run):** for each scan condition, use vision only if its F1 beats `docling_ocr` by
   at least 0.05 (more than twice the noise floor), and no page failed. If the gap is smaller, use free OCR.
-- **Pilot results (clean PDFs only, budgets $1.00 and $0.30):** no keep rule was written before the pilot. <user:
-  write the rule, and say it came after the run>
+- **Stop rule:** from 3b3 Step 2: stop if any page fails, if a call hits the token limit, or if the cost passes the
+  usual estimate by 50% before the first condition is done. It was used, but not written here before the run. Mild:
+  did not fire. Heavy: fired twice.
+- **Results:**
+
+  | Cell | run_id | P | R | F1 | CER | Parse $/doc | Extract $/doc | Total $/doc | s/page | Review | Errors |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | cuad_txt | 20261114-213821 | 0.86 | 0.88 | 0.87 | 0.000 | 0 | 0.0013 | 0.0013 | 0.00 | 7.4% | 0 |
+  | pypdf | 20261114-213927 | 0.88 | 0.88 | 0.88 | 0.003 | 0 | 0.0015 | 0.0015 | 0.01 | 7.4% | 0 |
+  | docling | 20261114-214005 | 0.91 | 0.91 | 0.91 | 0.015 | 0 | 0.0013 | 0.0013 | 1.09 | 7.4% | 0 |
+  | deepseek_vl | 20261114-214033 | 0.83 | 0.79 | 0.81 | 0.007 | 0.0234 | 0.0013 | 0.0247 | 8.66 | 7.4% | 0 |
+  | pypdf@mild | 20261114-214055 | 0.00 | 0.00 | 0.00 | 1.000 | 0 | 0.0002 | 0.0002 | 0.00 | 0.0% | 0 |
+  | docling_ocr@mild | 20261114-214100 | 0.90 | 0.88 | 0.89 | 0.066 | 0 | 0.0015 | 0.0015 | 7.32 | 8.3% | 1 |
+  | deepseek_vl@mild | 20261114-214126 | 0.88 | 0.81 | 0.84 | 0.005 | 0.0233 | 0.0012 | 0.0245 | 9.27 | 7.4% | 0 |
+  | pypdf@heavy | 20261114-214149 | 0.00 | 0.00 | 0.00 | 1.000 | 0 | 0.0002 | 0.0002 | 0.00 | 0.0% | 0 |
+  | docling_ocr@heavy | 20261114-214154 | 0.77 | 0.79 | 0.78 | 0.238 | 0 | 0.0035 | 0.0035 | 6.61 | 25.0% | 11 |
+  | deepseek_vl@heavy | 20261114-214333 | 0.93 | 0.88 | 0.90 | 0.011 | 0.0306 | 0.0013 | 0.0319 | 12.70 | 6.5% | 0 |
+
+  F1 gaps with 95% ranges (paired bootstrap over contracts, 4,000 re-samples, seed 7):
+  - Mild, vision minus OCR: -0.051 (-0.140 to +0.031): could be zero.
+  - Heavy, vision minus OCR: +0.123 (+0.030 to +0.237): a real gap.
+  - Mild OCR minus `cuad_txt`: +0.021 (0.000 to +0.042): the size of the noise floor.
+  - Clean, `docling` minus vision: +0.097 (+0.014 to +0.189). `pypdf` minus vision: +0.074 (-0.027 to +0.182).
+
+  ![Quality against cost for each scan condition](figures/e3_quality_cost.png)
+
+  Failed pages, heavy vision: 2 of 147 page calls. Both gave an empty answer after the model spent all its tokens on
+  hidden thinking: Kubient page 2 at 12,000, and El Pollo page 7 at 32,000. Both pages passed on a retry. Every good
+  page used at most 9,630 tokens, so the higher limit did not save a page.
+
+  Spend: parse mild $0.2096, heavy $0.3646 with the failed tries. The table shows heavy parse as $0.0306 per doc,
+  because the cache only knows the parses that worked. The real number is $0.0405 per doc. Extraction for all 10
+  cells $0.1191. Docling OCR needed more repair retries: 12 on heavy (21 calls), 2 on mild. Total for the main
+  runs: $0.6933.
+
+  Pilot (clean PDFs only, budgets $1.00 and $0.30, before the design):
 
   | Parser | Docs | Pages | Ratio | Quotes found | Cost | s/page |
   |---|---|---|---|---|---|---|
@@ -341,9 +384,20 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   | docling | 9 | 69 | 0.991 | 157/158 | $0 | 1.09 |
   | deepseek_vl | 9 | 69 | 0.994 | 153/158 | $0.2108 | 8.66 |
 
-  - DeepSeek: 69 of 69 pages OK, $0.0031 per page, largest output 7,028 tokens.
-- **Results:** none yet (3b3).
-- **Limits:** Few pages, one run each. The pilot used only PDFs with a text layer, where copying the text is expected
-  to win. Its gap is 4 quotes of 158, too small to rank quality.
-- **Conclusion:** pilot: <user: the result against the rule>. Main: after 3b3.
-- **Next step:** 3b3: free cells first, then the paid vision cells, then the pipeline on every cell.
+  DeepSeek: 69 of 69 pages OK, $0.0031 per page, largest output 7,028 tokens. No keep rule was written before the
+  pilot.
+- **Limits:** 9 contracts, fake scans, one extraction model, one run per cell, noise floor about 0.02. Fake damage is
+  simpler than real scans (no stamps, no handwriting, no fold marks). Vision scored 0.81 on clean PDFs and 0.90 on
+  heavy scans. Damage cannot improve the text, so this shows how much F1 moves on 9 contracts. Mild OCR above
+  `cuad_txt` is noise for the same reason. In production, nothing says if a scan is mild or heavy.
+- **Conclusion:**
+  - Pilot: `deepseek_vl` was the only vision model tested to the end, so it went to 3b.
+  - Clean (not part of the rule): no vision. `docling` beats it by +0.097 F1, at about 1/19 of the cost per contract.
+  - Mild: vision is not kept. Its gap to `docling_ocr` is -0.051, not +0.05, so free OCR is used.
+  - Heavy: the F1 line passes: +0.123, and the whole range is above 0. "No page failed": <user: do 2 page calls
+    that failed and then passed on a retry break this line?>
+  - If it passes: "`deepseek_vl` for heavy scans, because it beats Docling OCR by +0.123 F1 (+0.03 to +0.24), at
+    $0.042 per contract with failed tries, against $0.0035."
+- **Next step:** Phase 4. Route by input: a PDF with a text layer goes to `pypdf` or `docling`, and a scan goes to
+  Docling OCR first, then to vision when the OCR result looks bad (errors, review rate). Decide if Docling goes in the
+  Docker image.
