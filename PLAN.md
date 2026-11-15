@@ -286,7 +286,9 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | done |
 | 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | done |
 | 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
-| 3 | 4a | planner + API | request -> fields, FastAPI `/v1/extract` + `/health`, key, rate limit, spend cap | planned |
+| 3 | 4a | planner | request -> fields (enum), unknowns, `selected_model`, E4 on hand-written requests | doc ready |
+| 3 | 4a2 | API | FastAPI `/health` + `/v1/extract`, pipeline function, parser by PDF, limits, timeout | doc ready |
+| 3 | 4a3 | guards | API key, per-IP rate limit, daily spend cap (reserve worst case, settle real cost) | doc ready |
 | 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
 | 3 | 4c | ship | Docker, Cloud Run, GitHub Actions with eval gate on `evals/mini/` | planned |
 | 3 | 4d | UI | Next.js upload + cited JSON view on Vercel (Claude scaffolds) | planned |
@@ -489,6 +491,17 @@ would you deploy, monitor, secure, roll back and scale this to 100x?
 > (multipart PDF + `request` text) -> plan, parse, extract + validate -> JSON; `GET /health`.
 > Pydantic response models, size limits, timeouts, API-key auth, per-IP rate limit, daily spend
 > cap. Compare each piece to Express."
+
+> The 4a prompt did not fit one doc, so it is split in three. 4a is the planner and E4. 4a2 and 4a3 are below.
+
+> **4a2 API (user decisions):** "Needs 4a. FastAPI app, `GET /health`, `POST /v1/extract` calling one typed
+> `run_pipeline` in `domain/`: parse (pypdf, or Docling OCR for a scan), plan, extract with retries and a token
+> limit (API only), check, return the asked fields. Routing, size limits and the time limit are user decisions,
+> from E3 and the `llm_calls` latency. One status code per known failure. Tests with a fake model and parser."
+
+> **4a3 Guards (user decisions):** "Needs 4a2. API-key dependency (fail closed, constant-time compare), per-IP
+> sliding-window rate limit, daily spend cap that reserves the worst case before the first paid call and settles
+> the real cost in `finally`. Numbers are user decisions. In memory for now; 4b moves spend to Postgres."
 
 > **4b Observability:** "Phoenix with OpenInference/OpenTelemetry so each request shows spans:
 > plan, parse, extract attempts, validate. Structured JSON logs. Request/cost log in Postgres
