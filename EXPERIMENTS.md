@@ -305,19 +305,35 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
 - **Next step:** done: `--retries` default is now 2 in `evals/runner.py`. Then Phase 3, the same loop and trust
   table on worse text, where errors should be more common.
 
-## E3.0: vision model pilot
-- **Date:** 2026-11-08
-- **run_id(s):** pilot-20261108-210053 (3 docs), pilot-20261108-212103 (6 more docs; the first 3 came from the
-  cache). Calls are in `llm_calls`.
-- **Question / hypothesis:** Does the DeepSeek vision model read our contract pages well enough for its cost?
-- **Data:** dev, 9 contracts, 69 pages (`--per-band 3`: 3 from each third of the lengths, at most 20 pages each),
-  PDFs with a text layer. No scans yet.
-- **Setup:** deepseek/deepseek-v4.1-flash-1017 on Parasail. One call per page, 150 DPI,
-  grayscale, page cap 20, token limit 12,000, the copy prompt in `domain/parse/vision.py`. Budgets: $1.00 and $0.30.
-  Free baselines: pypdf, and Docling with OCR and tables off.
-- **Keep rule (written before the run):** none was written before the run. <user: write the rule, and say it came
-  after the run>
-- **Results:**
+## E3: parsers on clean PDFs and fake scans
+- **Date:** pilot 2026-11-08 (3a3). Design 2026-11-14, written before any main run.
+- **run_id(s):** pilot: pilot-20261108-210053 (3 docs), pilot-20261108-212103 (6 more docs; the first 3 came from
+  the cache). Calls are in `llm_calls`. Main runs: none yet (3b3).
+- **Question / hypothesis:** On scans, is vision worth paying for, or is free OCR good enough? The pilot asked first:
+  does the DeepSeek vision model read our contract pages well enough for its cost?
+- **Data:** set `e3` (frozen, `freeze --per-band 3`): the 9 dev docs of the pilot, 69 pages, 158 label quotes. 3 docs
+  from each third of the lengths, at most 20 pages each. Clean vision is already paid for. The cost is small, and it
+  is a small test.
+- **Setup:**
+  - Vision (`deepseek_vl`): deepseek/deepseek-v4.1-flash-1017 on Parasail. One call per page, 150 DPI, grayscale,
+    page cap 20, token limit 12,000, the copy prompt in `domain/parse/vision.py`.
+  - Docling OCR (`docling_ocr`): RapidOCR with the torch backend, pinned. It works here and in the Docker image.
+    Pinning it means the result does not depend on what else is installed. Tables off.
+  - Free baselines: `pypdf`, and `docling` with OCR and tables off.
+- **Deciding metric:** F1 on all 12 fields. It measures what the product returns. CER is only used to explain
+  results.
+- **Costs that count:** parse plus extraction plus retries, per contract. Time per page is a separate column, and it
+  goes to Phase 4.
+- **Cells:** 9 cells, plus `cuad_txt` on the same docs as the reference.
+  - Clean: `pypdf`, `docling`, `deepseek_vl`.
+  - Per scan condition (`mild`, `heavy`): `pypdf`, `docling_ocr`, `deepseek_vl`.
+- **Noise floor (evidence):** the same model and prompt on `cuad_txt`, on these 9 docs: F1 0.901, 0.881 and 0.881
+  (runs 20261102-200003, 20261105-213036, 20261108-062221). Gap 0.02, and only the provider changed. One field moves
+  F1 by about 0.014.
+- **Keep rule (written before the run):** for each scan condition, use vision only if its F1 beats `docling_ocr` by
+  at least 0.05 (more than twice the noise floor), and no page failed. If the gap is smaller, use free OCR.
+- **Pilot results (clean PDFs only, budgets $1.00 and $0.30):** no keep rule was written before the pilot. <user:
+  write the rule, and say it came after the run>
 
   | Parser | Docs | Pages | Ratio | Quotes found | Cost | s/page |
   |---|---|---|---|---|---|---|
@@ -326,7 +342,8 @@ Rules: tune on **dev** only; **test** is for final numbers. Change one thing at 
   | deepseek_vl | 9 | 69 | 0.994 | 153/158 | $0.2108 | 8.66 |
 
   - DeepSeek: 69 of 69 pages OK, $0.0031 per page, largest output 7,028 tokens.
-- **Limits:** Few pages, one run each, and PDFs with a text layer, where copying the text is expected to win. The gap
-  is 4 quotes of 158, too small to rank quality.
-- **Conclusion:** <user: the result against the rule>
-- **Next step:** 3b, fake scans and the full parser comparison, with Docling OCR on.
+- **Results:** none yet (3b3).
+- **Limits:** Few pages, one run each. The pilot used only PDFs with a text layer, where copying the text is expected
+  to win. Its gap is 4 quotes of 158, too small to rank quality.
+- **Conclusion:** pilot: <user: the result against the rule>. Main: after 3b3.
+- **Next step:** 3b3: free cells first, then the paid vision cells, then the pipeline on every cell.

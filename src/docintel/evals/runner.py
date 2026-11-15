@@ -15,6 +15,9 @@ from docintel.core.config import get_settings
 from docintel.core.llm import log_call
 from docintel.domain.extract.extract import build_messages
 from docintel.domain.extract.retry import Attempt, extract_with_retry, final_answer
+from docintel.domain.parse.base import ParsedDoc
+from docintel.domain.parse.cache import CACHE_DIR, cache_path
+from docintel.domain.parse.scan import CONDITIONS
 from docintel.domain.schema.fields import ContractFields, Names
 from docintel.domain.validate.rules import bad_schema, check_answer
 from docintel.evals.scorers import metrics, score_doc
@@ -48,13 +51,20 @@ CREATE TABLE IF NOT EXISTS attempts (
     cost_usd DOUBLE, latency_ms INTEGER, raw_text VARCHAR,
     PRIMARY KEY (run_id, doc_id, attempt_no)
 );
+CREATE TABLE IF NOT EXISTS eval_sets (
+    set_name VARCHAR, doc_id VARCHAR, PRIMARY KEY (set_name, doc_id)
+);
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 0;
 """
 
 
 def docs_for(con: duckdb.DuckDBPyConnection, split: str) -> list[str]:
     """The doc_ids of one split, always in the same order."""
-    rows = con.execute("SELECT doc_id FROM splits WHERE split = ? ORDER BY doc_id", [split])
+    rows = con.execute(
+        "SELECT doc_id FROM splits WHERE split = $s "
+        "UNION ALL SELECT doc_id FROM eval_sets WHERE set_name = $s ORDER BY doc_id",
+        {"s": split},
+    )
     return [doc_id for (doc_id,) in rows.fetchall()]
 
 
@@ -64,7 +74,27 @@ def cuad_txt(con: duckdb.DuckDBPyConnection, doc_id: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-PARSERS = {"cuad_txt": cuad_txt}  # 3b adds the parsers from 3a
+CLEAN_CELLS = ["pypdf", "docling", "deepseek_vl"]
+SCAN_PARSERS = ["pypdf", "docling_ocr", "deepseek_vl"]
+CELLS = CLEAN_CELLS + [f"{p}@{c}" for c in CONDITIONS for p in SCAN_PARSERS]
+
+
+def cached_text(cell: str, doc_id: str, cache_dir: Path = CACHE_DIR) -> str:
+    """The stored text of one cell. A run reads it, and can never start a paid parse."""
+    path = cache_path(cell, doc_id, cache_dir)
+    if not path.exists():
+        raise FileNotFoundError(f"no parse for {cell} / {doc_id}: run the parse stage first")
+    return ParsedDoc.model_validate_json(path.read_text(encoding="utf-8")).text
+
+
+def text_of(cell: str):
+    def read(con: duckdb.DuckDBPyConnection, doc_id: str) -> str:
+        return cached_text(cell, doc_id)
+
+    return read
+
+
+PARSERS = {"cuad_txt": cuad_txt, **{cell: text_of(cell) for cell in CELLS}}
 CHARS_PER_TOKEN = 4.0  # 1b measured about 4.6; a smaller number makes the guess a little high
 OUTPUT_TOKENS = 1000  # per contract; the 1b answer used 697
 
@@ -295,7 +325,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="python -m docintel.evals.runner")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="extract every doc of a split, then score the run")
-    run.add_argument("--split", choices=["dev", "test"], default="dev")
+    run.add_argument("--split", choices=["dev", "test", "e3"], default="dev")
     run.add_argument("--parser", choices=list(PARSERS), default="cuad_txt")
     run.add_argument("--model", help="OpenRouter model id (default: DOCINTEL_MODEL)")
     run.add_argument("--prompt-version", default="v1")
