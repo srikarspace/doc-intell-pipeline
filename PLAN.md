@@ -8,9 +8,9 @@ user explaining it back.
 
 Goal: the user can explain every design choice and trade-off and reproduce it. Not vibe-coded.
 
-**The product (end state):** upload a contract, type a request ("parties, renewal term, any
-non-compete?"), get JSON with each answer, the exact quote from the contract, and a needs-review
-flag.
+**The product (end state):** pick the fields to find, upload a contract or pick a sample, get JSON
+with each answer, the exact quote from the contract (highlighted in the PDF), and a needs-review
+flag that the user accepts or fixes.
 
 **4 questions the project must answer (hiring manager):**
 1. Which documents did we choose, and why?
@@ -35,7 +35,7 @@ pipeline quality is measured with evals. TDD comes back after the 4 projects.
 1. Paste the tutor contract plus the part's prompt into a fresh session. The tutor writes
    `learn/phase-N.md` and `learn/py/phase-N.md`, then stops.
 2. The user drives with AI pairing. Core logic (schema, prompts, scoring, validators, parsers
-   interface, planner) is drafted by the user first, at least as a skeleton; Claude then helps
+   interface) is drafted by the user first, at least as a skeleton; Claude then helps
    finish, debug, and writes boilerplate on request.
 3. Explain-back gate: before committing, the user explains each changed file to Claude. The user
    commits; Claude never commits.
@@ -95,7 +95,7 @@ Explain design before code. Every doc has a "Design decisions" section: each tab
 interface or algorithm choice, why it looks this way, and the main alternative in one line.
 
 My decisions stay mine. Where the plan marks a step as a user decision (fields, schema,
-prompts, scoring rules, split rules, planner behaviour), first lay out the options and the
+prompts, scoring rules, split rules), first lay out the options and the
 evidence to look at, ask me to decide and write it down, then give a reference version inside a
 <details> block so I can compare after.
 
@@ -208,6 +208,7 @@ by anchor instead of repeating them. The phase doc links in with
 | LLM | OpenRouter, open-weight. Extraction: DeepSeek V4 Flash (kept in E1.1; text only). Multimodal parse: one vision LLM, chosen in 3a3 from DeepSeek V4.1 Flash and Kimi K2.6. `response_format: json_schema` + `require_parameters: true` |
 | Validation | Pydantic (always; provider schema enforcement is not guaranteed) |
 | Parsers | pypdf (naive, free) vs Docling (layout, local, free) vs vision LLM (page images, paid) |
+| Fields in the app | Picked from a list (12 chips in 4 groups), not typed: deterministic, no extra paid call, only measured fields (user decision, 2026-11-16). The free-text planner of the brief is cut. The model always extracts all 12; the API keeps the chosen ones |
 | Store | DuckDB for everything (`data/docintel.duckdb`): evals (contracts, labels, splits, runs, predictions, scores, cost, latency) and the app (requests, reviews) |
 | Tracing | Arize Phoenix as a local process + structlog JSON logs |
 | Serve | **Local only, one user (the user).** One FastAPI process serves the API and the React (Vite) + daisyUI app at `localhost:8000`. No auth, rate limit or spend cap: the only guards are the per-call token limits and a credit limit on the OpenRouter key. No Docker, CI or deploy work; they are README "future work" |
@@ -231,11 +232,10 @@ Standard layout shared by every project (see ../PLAN.md). Only `domain/` is proj
 ```
 src/docintel/
   core/      config.py (pydantic-settings) · llm.py (OpenRouter client, cost, retries) · log.py · trace.py
-  domain/    schema/ (field models) · extract/ · validate/ · parse/ (+ scan degrader) · planner/
+  domain/    schema/ (field models) · extract/ · validate/ · parse/ (+ scan degrader) · locate.py · pipeline.py
   evals/     store.py (DuckDB) · datasets.py (CUAD download/load, splits) · scorers.py (P/R) · runner.py (run_id)
-  api/       app.py · routes.py · schemas.py · samples.py · samples/ (10 sample PDFs)
+  api/       app.py · routes.py · fields.py · schemas.py · samples.py · samples/ (10 sample PDFs)
 web/         React + Vite + daisyUI app (built to web/dist, served by FastAPI)
-evals/       planner_requests.json (E4)
 learn/       phase docs · notebooks/ · tests/
 Makefile · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
 ```
@@ -243,7 +243,7 @@ Makefile · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
 This project is local-first, so it leaves out parts of the shared layout: `db/` (DuckDB is enough), `evals/mini/` and
 the CI eval gate, `Dockerfile` and deploy workflows. They are README "future work".
 
-Agentic pattern: each capability (`extract`, `parse`, `plan`) is a typed function (Pydantic in,
+Agentic pattern: each capability (`extract`, `parse`, `locate`) is a typed function (Pydantic in,
 Pydantic out) with a trace span, called by the API, the eval runner, and later as an agent tool.
 
 ## Experiment discipline (every phase)
@@ -260,7 +260,7 @@ Pydantic out) with a trace span, called by the API, the eval runner, and later a
 ## Roadmap (3 weeks)
 
 The project is done at the end of week 3 (weeks 1 to 3 of `../PLAN.md`). One part per working
-day. Parts were merged to fit; the router is cut (README future work).
+day. Parts were merged to fit; the router and the free-text planner are cut (README future work).
 
 | Week | Part | Topic | What it builds | Status |
 |---|---|---|---|---|
@@ -289,12 +289,11 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | done |
 | 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | done |
 | 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
-| 3 | 4a | planner | request -> fields (enum), unknowns, `selected_model`, E4 on hand-written requests | doc ready |
-| 3 | 4a2 | API | FastAPI app, `run_pipeline`, samples + upload, parser by PDF, limits, time limit | doc ready |
-| 3 | 4a3 | highlights + stream | quote -> page boxes (`locate`), stage events, `POST /v1/extract/stream` (SSE) | doc ready |
-| 3 | 4b | observability + reviews | Phoenix spans (local), JSON logs, `requests` + `reviews` in DuckDB, `POST /v1/reviews`, p50/p95/cost query | planned |
-| 3 | 4c | UI shell | React + Vite + daisyUI: sample picker, drop zone, request box, analyze card (stages, reveal, badges), `make app` | planned |
-| 3 | 4c2 | UI review + demo | react-pdf pane + highlights, review modal, Passed state, one Playwright e2e, demo video | planned |
+| 3 | 4a | API | FastAPI app, `run_pipeline`, `Literal` field names + `GET /v1/fields`, samples + upload, parser by PDF, limits, time limit | doc ready |
+| 3 | 4a2 | highlights + stream | quote -> page boxes (`locate`), evidence lines for "maybe missed", stage events, `POST /v1/extract/stream` (SSE) | doc ready |
+| 3 | 4b | observability + reviews | Phoenix spans (local), JSON logs, `requests` + `reviews` in DuckDB, `POST /v1/reviews` + undo, p50/p95/cost query | planned |
+| 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | planned |
+| 3 | 4c2 | UI review + demo | react-pdf pane + quote and evidence highlights, review card (Modify / Accept, undo), Passed, Copy JSON, one Playwright e2e, demo video | planned |
 | 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
 
 ---
@@ -479,29 +478,37 @@ for multimodal; why CER and F1 can disagree.
 
 ---
 
-## Phase 4: product (pick or upload -> findings -> highlight -> review), local, for one user
+## Phase 4: product (pick fields and a contract -> findings -> highlight -> review), local, for one user
 
-**The product.** Pick a sample contract or drop a PDF, and type a request (empty = all 12 fields). An "Analyzing"
-card shows the real stages (parse, plan, extract, retries, check), then the rows appear one by one: a check (found),
-a dash (not found), or "!" (needs review). Click a row: the PDF on the right scrolls to the quote and highlights it.
-Click a "!" row: a review box says why it was flagged, with Accept, Edit or Not found (saved in DuckDB). When every
-"!" is resolved, the badge says "Passed".
+**The product.** Pick the fields (12 chips in 4 groups, all on by default), then drop a PDF or click a sample tile. An
+"Analyzing" card shows the real stages on a pill under it (reading the PDF, finding the fields, checking every quote),
+then the rows tick in one by one: a check (found), a dash (not found), or "!" (needs review, amber row). The card moves
+left and the PDF opens on the right. Click a row: the PDF scrolls to its quote and highlights it. Click a "!" row: a
+review card says in plain words why it was flagged, highlights the evidence line in amber, and offers Modify or Accept
+(with undo), saved in DuckDB. When every "!" is resolved, the pill says "Passed". "New contract" stays at the top.
+
+UX reference: the clickable prototype on real stored answers, https://claude.ai/artifact/GfHhJZAR6YUX8zmS8m6tS6
+(private). One accent color for buttons and the loading ring.
 
 ```text
-┌ Analyze ─────────────────────────────────┬─────────────────────────────────┐
-│ Kubient MSA, Part 2 • Service (Analyzing)│  PDF page 1 of 2                │
-│ Parse ✓  Plan ✓  Extract …  Check        │  ┌───────────────────────────┐  │
-│ ✓ Parties     Kubient, Inc.; The AP      │  │ ... ███ highlighted ███   │  │
-│ — Non-compete  not found                 │  │     quote ...             │  │
-│ ! Renewal term  not found · Review       │  └───────────────────────────┘  │
-│ Not supported: payment terms             │  pypdf · 2 pages · $0.0007 · 6s │
-└──────────────────────────────────────────┴─────────────────────────────────┘
+[< New contract]
+┌ iVillage: sponsorship agreement • Sponsorship ┐  ┌ PDF ────────────────────────────┐
+│ ✓ Parties        Ford Motor Media; iVillage p.1│  │ page 1                          │
+│ ! Non-compete    Yes · "For the Initial Term…" │  │  ... ███ highlighted quote ███  │
+│   ┌ Needs a look ──────────────────────────┐   │  │  ... ░░░ evidence line ░░░      │
+│   │ The quote may be about something else. │   │  │                                 │
+│   │ [Modify]  [Accept]                     │   │  └─────────────────────────────────┘
+│   └────────────────────────────────────────┘   │
+│ — Change of control   Not in this contract     │
+│ pypdf · 5 pages · $0.0016 · 20.1 s  [Copy JSON]│
+└──────────────── ( ! 3 issues found ) ──────────┘
 ```
 
-**API (`/v1`, same origin as the UI, so no CORS).** `GET /health`; `GET /v1/samples` and `/v1/samples/{id}/pdf`;
-`POST /v1/extract` and `POST /v1/extract/stream` (SSE: `stage`, `plan`, `attempt`, `result` or `error`), with a
-multipart `pdf` or a `sample_id`, plus `request`; `POST /v1/reviews`. Each returned field carries `highlights`: page,
-page size and line boxes in PDF points (empty for scans).
+**API (`/v1`, same origin as the UI, so no CORS).** `GET /health`; `GET /v1/fields` (name, label, group: the chips);
+`GET /v1/samples` and `/v1/samples/{id}/pdf`; `POST /v1/extract` and `POST /v1/extract/stream` (SSE: `stage`,
+`attempt`, `result` or `error`), with a multipart `pdf` or a `sample_id`, plus repeated `fields` (none = all 12; an
+unknown name is 422); `POST /v1/reviews` and `DELETE` for undo. Each returned field carries `highlights` (page, page
+size, line boxes in PDF points; empty for scans) and, for "maybe missed", `evidence` lines with their own boxes.
 
 **Local, for one user.** The app runs on the user's machine, and the user is its only user. So there is no auth,
 rate limit, spend cap, Docker, CI or deploy work: they guard against strangers and servers that do not exist here.
@@ -523,38 +530,42 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > Pydantic response models, size limits, timeouts, API-key auth, per-IP rate limit, daily spend
 > cap. Compare each piece to Express."
 
-> The 4a prompt did not fit one doc, so it is split: 4a is the planner and E4; 4a2 and 4a3 are below. After the
-> product decision (local, one user), the auth, rate limit and spend cap were dropped from this prompt.
+> The 4a prompt was rewritten after two product decisions. Local, one user: the auth, rate limit and spend cap are
+> dropped. Fields are picked from a list in the UI: the planner and E4 are dropped. 4a is now the API, and 4a2 is
+> highlights and the stream:
 
-> **4a2 API (user decisions):** "Needs 4a. FastAPI app, `GET /health`, `GET /v1/samples` and
-> `/v1/samples/{id}/pdf` (10 committed CUAD dev PDFs, one of them a fake scan), `POST /v1/extract` with a multipart
-> `pdf` or a `sample_id`, calling one typed `run_pipeline` in `domain/`: parse (pypdf, or Docling OCR for a scan),
-> plan, extract with retries and a token limit (API only), check, return the asked fields and a `document` block.
-> Routing, size limits and the time limit are user decisions, from E3 and the `llm_calls` latency. One status code
-> per known failure. Tests with a fake model and parser. Compare each piece to Express."
+> **4a API (user decisions):** "FastAPI app, `GET /health`, `GET /v1/fields` (label and group of each field, for the
+> chips), `GET /v1/samples` and `/v1/samples/{id}/pdf` (10 committed CUAD dev PDFs, one of them a fake scan),
+> `POST /v1/extract` with a multipart `pdf` or a `sample_id` and repeated `fields` (`Literal` names from
+> `ContractFields`; none = all 12), calling one typed `run_pipeline` in `domain/`: parse (pypdf, or Docling OCR for a
+> scan), extract all 12 with retries and a token limit (API only), check, keep the chosen fields, and a `document`
+> block. Routing, size limits and the time limit are user decisions, from E3 and the `llm_calls` latency. One status
+> code per known failure. Tests with a fake model and parser. Compare each piece to Express."
 
-> **4a3 Highlights + stream:** "Needs 4a2. `domain/locate.py`: a quote -> page and line boxes, with pypdfium2 char
-> boxes and the same word rule as the citation check; empty for scans. `on_event` / `on_attempt` callbacks in the
-> pipeline (no HTTP inside). `POST /v1/extract/stream` with sse-starlette: `stage`, `plan`, `attempt`, `result` or
-> `error`, with the same input checks and time limit. Tests: boxes on a committed sample, event order with the fake
-> model."
+> **4a2 Highlights + stream:** "Needs 4a. `domain/locate.py`: a quote -> page and line boxes, with pypdfium2 char
+> boxes and the same word rule as the citation check; empty for scans. Evidence for 'maybe missed': the whole line
+> around the rule's match, with its boxes. `on_event` / `on_attempt` callbacks in the pipeline (no HTTP inside).
+> `POST /v1/extract/stream` with sse-starlette: `stage`, `attempt`, `result` or `error`, with the same input checks and
+> time limit. Tests: boxes on committed samples, an evidence line, event order with the fake model."
 
-> **4b Observability + reviews:** "Needs 4a3. Phoenix as a local process (`make phoenix`), spans for parse, plan,
+> **4b Observability + reviews:** "Needs 4a2. Phoenix as a local process (`make phoenix`), spans for parse,
 > extract attempts and check, plus OpenInference auto-traces of the OpenAI calls. structlog JSON logs with
 > `request_id`. Two DuckDB tables in `data/docintel.duckdb`: `requests` (one row per extract: document, fields,
-> parser, cost, latency) and `reviews` (accept, edit, not found, old and new value). `POST /v1/reviews`. A
-> p50/p95/error/cost query over `requests`. How to read a trace. No new server: DuckDB and Phoenix run on the
-> user's machine."
+> parser, cost, latency) and `reviews` (accept or modify, old and new value). `POST /v1/reviews`, and `DELETE` for
+> undo. A p50/p95/error/cost query over `requests`. How to read a trace. No new server: DuckDB and Phoenix run on
+> the user's machine."
 
 > **4c UI shell:** "Needs 4b. `web/`: React + Vite + TypeScript + Tailwind + daisyUI + lucide-react + TanStack
-> Query. Sample picker, drop zone (PDF only), request box, analyze card (daisyUI `steps` from the real SSE stages,
-> `skeleton` rows that reveal one by one, badges Analyzing / Issue found / Passed), cost footer. `fetch` +
+> Query. Field chips from `GET /v1/fields` (4 groups, all on, select all / clear), drop zone (PDF only), sample tiles,
+> analyze card as in the prototype (stage pill in one accent color, `skeleton` rows that reveal one by one, pill
+> Analyzing / Issue found / Passed), cost footer, 'New contract' at the top. `fetch` +
 > eventsource-parser for the stream. `make web` (Vite dev server with a proxy to the API) and `make app` (build
 > `web/dist`, then FastAPI serves it with the API). Claude may scaffold; the user reviews and explains it back."
 
 > **4c2 UI review + demo:** "Needs 4c. react-pdf pane (pdf.js eval off) with our highlight overlay: click a row,
-> scroll to its page, pulse its boxes. Review modal for '!' rows (why flagged, quotes, Accept / Edit / Not found ->
-> `POST /v1/reviews`), Passed when all are resolved. One Playwright e2e on one sample. Record the demo video for the
+> scroll to its page, pulse its boxes; evidence boxes in amber. Review card under a '!' row (why flagged in plain
+> words, quote or evidence, Modify / Accept, undo -> `/v1/reviews`), then open the next flagged row. Passed when all
+> are resolved, Copy JSON of the reviewed answer. One Playwright e2e on one sample. Record the demo video for the
 > write-up. Claude may scaffold; the user reviews and explains it back."
 
 ---
@@ -567,7 +578,7 @@ passes a mock interview.
 > **5 Write-up + interview:** "Final figures from DuckDB (per-field P/R, parser quality vs cost,
 > retry lift), each citing its run_id, and a mermaid diagram. Guide me through the README
 > narrative (problem, data choice, architecture, results, trade-offs, failures, next, including
-> the router and "putting it online" (auth, limits, spend cap, Postgres, Docker, CI) as future work),
+> the router, a free-text planner, and "putting it online" (auth, limits, spend cap, Postgres, Docker, CI) as future work),
 > with the demo video from 4c2. I write it. Then act as a hiring manager: 10 hard questions one at
 > a time (deploy, monitoring, security, scaling), no help, grade at the end with gaps to study.
 > Then tick checklist items in ../PLAN.md."
@@ -580,5 +591,5 @@ passes a mock interview.
 - Every number in the README traces to a `run_id` in DuckDB and an entry in `EXPERIMENTS.md`.
 - Reproducibility: fresh clone -> `uv sync` -> `make data` -> `run --split test ...` reproduces
   the final table.
-- Local: `make app`, then `curl -F sample_id=kubient -F request="parties and renewal term"
+- Local: `make app`, then `curl -F sample_id=kubient -F fields=parties -F fields=renewal_term
   localhost:8000/v1/extract` returns cited JSON, and the UI shows the same answer with highlights.

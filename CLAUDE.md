@@ -4,10 +4,10 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 
 ## Hard rules
 - **Tutor + AI-assisted.** Follow the tutor contract in `PLAN.md`. Each part starts with `learn/phase-N.md` + `learn/py/phase-N.md`.
-- **The user drives.** The user drafts core logic first (schema, prompts, scoring, validators, parser interface, planner), at least as a skeleton. Claude pairs: suggests, debugs, and writes boilerplate (API wiring, Docker, CI, UI) only when asked.
+- **The user drives.** The user drafts core logic first (schema, prompts, scoring, validators, parser interface), at least as a skeleton. Claude pairs: suggests, debugs, and writes boilerplate (API wiring, UI) only when asked.
 - **Explain-back gate** before every commit: the user explains each changed file; Claude probes gaps.
 - **Never commit, push, or create branches.** The user commits after each part.
-- **User decisions stay the user's** (fields, schema, prompts, scoring, split rules, planner behaviour): options and evidence first, the user decides, then a reference in a `<details>` block.
+- **User decisions stay the user's** (fields, schema, prompts, scoring, split rules, product choices): options and evidence first, the user decides, then a reference in a `<details>` block.
 - Stay within the current part's prompt in `PLAN.md`. No scope creep into later parts.
 - Never tune or peek at the **test** split for decisions; dev only.
 - Never read `LEARN.md` its for my learning purpose.
