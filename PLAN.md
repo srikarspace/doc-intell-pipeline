@@ -208,9 +208,10 @@ by anchor instead of repeating them. The phase doc links in with
 | LLM | OpenRouter, open-weight. Extraction: DeepSeek V4 Flash (kept in E1.1; text only). Multimodal parse: one vision LLM, chosen in 3a3 from DeepSeek V4.1 Flash and Kimi K2.6. `response_format: json_schema` + `require_parameters: true` |
 | Validation | Pydantic (always; provider schema enforcement is not guaranteed) |
 | Parsers | pypdf (naive, free) vs Docling (layout, local, free) vs vision LLM (page images, paid) |
-| Store | DuckDB offline (contracts, labels, splits, runs, predictions, scores, cost, latency); Postgres (Neon) in prod (request log, spend) |
-| Tracing | Arize Phoenix (local in dev; hosted or self-hosted for prod) + JSON logs |
-| Serve | FastAPI, Docker, GCP Cloud Run; Next.js UI on Vercel; GitHub Actions CI with eval gate (prod bar in ../PLAN.md) |
+| Store | DuckDB for everything (`data/docintel.duckdb`): evals (contracts, labels, splits, runs, predictions, scores, cost, latency) and the app (requests, reviews) |
+| Tracing | Arize Phoenix as a local process + structlog JSON logs |
+| Serve | **Local only, one user (the user).** One FastAPI process serves the API and the React (Vite) + daisyUI app at `localhost:8000`. No auth, rate limit or spend cap: the only guards are the per-call token limits and a credit limit on the OpenRouter key. No Docker, CI or deploy work; they are README "future work" |
+| Libraries | Popular, maintained, 0 open advisories (npm/PyPI + OSV, checked 2026-11-15). API: fastapi, uvicorn, python-multipart, sse-starlette. UI: react, vite, TypeScript, tailwindcss + daisyui, lucide-react, @tanstack/react-query, react-pdf, eventsource-parser. Observability: arize-phoenix-otel, openinference-instrumentation-openai, structlog. Lockfiles committed (`uv.lock`, `web/package-lock.json`) |
 | Tooling | Python 3.12, uv, pytest, ruff, Jupyter, Makefile |
 | Time | 3 weeks, one part per working day (see Roadmap). No time estimates inside docs |
 
@@ -232,13 +233,15 @@ src/docintel/
   core/      config.py (pydantic-settings) · llm.py (OpenRouter client, cost, retries) · log.py · trace.py
   domain/    schema/ (field models) · extract/ · validate/ · parse/ (+ scan degrader) · planner/
   evals/     store.py (DuckDB) · datasets.py (CUAD download/load, splits) · scorers.py (P/R) · runner.py (run_id)
-  api/       app.py · routes.py · schemas.py · auth.py · limits.py
-  db/        Postgres models + alembic migrations (prod request/spend log)
-web/         Next.js UI
-evals/mini/  fixed mini-set for the CI eval gate
+  api/       app.py · routes.py · schemas.py · samples.py · samples/ (10 sample PDFs)
+web/         React + Vite + daisyUI app (built to web/dist, served by FastAPI)
+evals/       planner_requests.json (E4)
 learn/       phase docs · notebooks/ · tests/
-Dockerfile · Makefile · .github/workflows/ci.yml · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
+Makefile · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
 ```
+
+This project is local-first, so it leaves out parts of the shared layout: `db/` (DuckDB is enough), `evals/mini/` and
+the CI eval gate, `Dockerfile` and deploy workflows. They are README "future work".
 
 Agentic pattern: each capability (`extract`, `parse`, `plan`) is a typed function (Pydantic in,
 Pydantic out) with a trace span, called by the API, the eval runner, and later as an agent tool.
@@ -287,11 +290,11 @@ day. Parts were merged to fit; the router is cut (README future work).
 | 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | done |
 | 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
 | 3 | 4a | planner | request -> fields (enum), unknowns, `selected_model`, E4 on hand-written requests | doc ready |
-| 3 | 4a2 | API | FastAPI `/health` + `/v1/extract`, pipeline function, parser by PDF, limits, timeout | doc ready |
-| 3 | 4a3 | guards | API key, per-IP rate limit, daily spend cap (reserve worst case, settle real cost) | doc ready |
-| 3 | 4b | observability | Phoenix spans, JSON logs, Postgres request/cost log | planned |
-| 3 | 4c | ship | Docker, Cloud Run, GitHub Actions with eval gate on `evals/mini/` | planned |
-| 3 | 4d | UI | Next.js upload + cited JSON view on Vercel (Claude scaffolds) | planned |
+| 3 | 4a2 | API | FastAPI app, `run_pipeline`, samples + upload, parser by PDF, limits, time limit | doc ready |
+| 3 | 4a3 | highlights + stream | quote -> page boxes (`locate`), stage events, `POST /v1/extract/stream` (SSE) | doc ready |
+| 3 | 4b | observability + reviews | Phoenix spans (local), JSON logs, `requests` + `reviews` in DuckDB, `POST /v1/reviews`, p50/p95/cost query | planned |
+| 3 | 4c | UI shell | React + Vite + daisyUI: sample picker, drop zone, request box, analyze card (stages, reveal, badges), `make app` | planned |
+| 3 | 4c2 | UI review + demo | react-pdf pane + highlights, review modal, Passed state, one Playwright e2e, demo video | planned |
 | 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
 
 ---
@@ -476,14 +479,42 @@ for multimodal; why CER and F1 can disagree.
 
 ---
 
-## Phase 4: service (request -> fields -> cited JSON, prod bar)
+## Phase 4: product (pick or upload -> findings -> highlight -> review), local, for one user
 
-**Done when:** the prod bar in ../PLAN.md is met: public API + UI URLs; upload PDF + text request
--> cited JSON with needs_review flags; auth, rate limit, spend cap; traces and cost log; CI eval
-gate green. This phase builds the reusable skeleton for `agents/_template/`.
+**The product.** Pick a sample contract or drop a PDF, and type a request (empty = all 12 fields). An "Analyzing"
+card shows the real stages (parse, plan, extract, retries, check), then the rows appear one by one: a check (found),
+a dash (not found), or "!" (needs review). Click a row: the PDF on the right scrolls to the quote and highlights it.
+Click a "!" row: a review box says why it was flagged, with Accept, Edit or Not found (saved in DuckDB). When every
+"!" is resolved, the badge says "Passed".
 
-**Learning checkpoint:** demo the live URL end to end, narrate each trace span, and answer: how
-would you deploy, monitor, secure, roll back and scale this to 100x?
+```text
+┌ Analyze ─────────────────────────────────┬─────────────────────────────────┐
+│ Kubient MSA, Part 2 • Service (Analyzing)│  PDF page 1 of 2                │
+│ Parse ✓  Plan ✓  Extract …  Check        │  ┌───────────────────────────┐  │
+│ ✓ Parties     Kubient, Inc.; The AP      │  │ ... ███ highlighted ███   │  │
+│ — Non-compete  not found                 │  │     quote ...             │  │
+│ ! Renewal term  not found · Review       │  └───────────────────────────┘  │
+│ Not supported: payment terms             │  pypdf · 2 pages · $0.0007 · 6s │
+└──────────────────────────────────────────┴─────────────────────────────────┘
+```
+
+**API (`/v1`, same origin as the UI, so no CORS).** `GET /health`; `GET /v1/samples` and `/v1/samples/{id}/pdf`;
+`POST /v1/extract` and `POST /v1/extract/stream` (SSE: `stage`, `plan`, `attempt`, `result` or `error`), with a
+multipart `pdf` or a `sample_id`, plus `request`; `POST /v1/reviews`. Each returned field carries `highlights`: page,
+page size and line boxes in PDF points (empty for scans).
+
+**Local, for one user.** The app runs on the user's machine, and the user is its only user. So there is no auth,
+rate limit, spend cap, Docker, CI or deploy work: they guard against strangers and servers that do not exist here.
+Two cheap guards stay: the per-call token limits, and a credit limit on the OpenRouter key. The demo video replaces
+the "public URL" of the prod bar in `../PLAN.md`, for this project only. How to deploy and secure it is README
+"future work", and an interview topic.
+
+**Done when:** `make app` gives the full flow at `localhost:8000` (pick or upload, live stages, findings, click to
+highlight, review, Passed); traces show in local Phoenix; request, cost and review rows are in DuckDB; `make test`
+is green; a demo video is recorded for the write-up.
+
+**Learning checkpoint:** demo the product, narrate one trace span by span, and answer: what would you add to put this
+on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), and how would it scale to 100x?
 
 > **4a Planner + API:** "Planner: map a free-text request to known fields (the 12), flag unknown
 > ones (behaviour is a user decision), build the schema from the selected Pydantic sub-models;
@@ -492,30 +523,39 @@ would you deploy, monitor, secure, roll back and scale this to 100x?
 > Pydantic response models, size limits, timeouts, API-key auth, per-IP rate limit, daily spend
 > cap. Compare each piece to Express."
 
-> The 4a prompt did not fit one doc, so it is split in three. 4a is the planner and E4. 4a2 and 4a3 are below.
+> The 4a prompt did not fit one doc, so it is split: 4a is the planner and E4; 4a2 and 4a3 are below. After the
+> product decision (local, one user), the auth, rate limit and spend cap were dropped from this prompt.
 
-> **4a2 API (user decisions):** "Needs 4a. FastAPI app, `GET /health`, `POST /v1/extract` calling one typed
-> `run_pipeline` in `domain/`: parse (pypdf, or Docling OCR for a scan), plan, extract with retries and a token
-> limit (API only), check, return the asked fields. Routing, size limits and the time limit are user decisions,
-> from E3 and the `llm_calls` latency. One status code per known failure. Tests with a fake model and parser."
+> **4a2 API (user decisions):** "Needs 4a. FastAPI app, `GET /health`, `GET /v1/samples` and
+> `/v1/samples/{id}/pdf` (10 committed CUAD dev PDFs, one of them a fake scan), `POST /v1/extract` with a multipart
+> `pdf` or a `sample_id`, calling one typed `run_pipeline` in `domain/`: parse (pypdf, or Docling OCR for a scan),
+> plan, extract with retries and a token limit (API only), check, return the asked fields and a `document` block.
+> Routing, size limits and the time limit are user decisions, from E3 and the `llm_calls` latency. One status code
+> per known failure. Tests with a fake model and parser. Compare each piece to Express."
 
-> **4a3 Guards (user decisions):** "Needs 4a2. API-key dependency (fail closed, constant-time compare), per-IP
-> sliding-window rate limit, daily spend cap that reserves the worst case before the first paid call and settles
-> the real cost in `finally`. Numbers are user decisions. In memory for now; 4b moves spend to Postgres."
+> **4a3 Highlights + stream:** "Needs 4a2. `domain/locate.py`: a quote -> page and line boxes, with pypdfium2 char
+> boxes and the same word rule as the citation check; empty for scans. `on_event` / `on_attempt` callbacks in the
+> pipeline (no HTTP inside). `POST /v1/extract/stream` with sse-starlette: `stage`, `plan`, `attempt`, `result` or
+> `error`, with the same input checks and time limit. Tests: boxes on a committed sample, event order with the fake
+> model."
 
-> **4b Observability:** "Phoenix with OpenInference/OpenTelemetry so each request shows spans:
-> plan, parse, extract attempts, validate. Structured JSON logs. Request/cost log in Postgres
-> (Neon free) with an alembic migration; a p50/p95/error/cost query. How to read a trace."
+> **4b Observability + reviews:** "Needs 4a3. Phoenix as a local process (`make phoenix`), spans for parse, plan,
+> extract attempts and check, plus OpenInference auto-traces of the OpenAI calls. structlog JSON logs with
+> `request_id`. Two DuckDB tables in `data/docintel.duckdb`: `requests` (one row per extract: document, fields,
+> parser, cost, latency) and `reviews` (accept, edit, not found, old and new value). `POST /v1/reviews`. A
+> p50/p95/error/cost query over `requests`. How to read a trace. No new server: DuckDB and Phoenix run on the
+> user's machine."
 
-> **4c Ship:** "Multi-stage slim Dockerfile with uv + .dockerignore (Docling in the image or not,
-> from Phase 3 results). GCP project, Artifact Registry, Cloud Run, Secret Manager; memory, CPU,
-> concurrency, min-instances=0 and their cost. OpenRouter key with a credit limit. GitHub
-> Actions: ruff, pytest, eval regression gate on `evals/mini/` (threshold is a user decision),
-> build and deploy on main. Rollback = redeploy the previous revision. I run every command."
+> **4c UI shell:** "Needs 4b. `web/`: React + Vite + TypeScript + Tailwind + daisyUI + lucide-react + TanStack
+> Query. Sample picker, drop zone (PDF only), request box, analyze card (daisyUI `steps` from the real SSE stages,
+> `skeleton` rows that reveal one by one, badges Analyzing / Issue found / Passed), cost footer. `fetch` +
+> eventsource-parser for the stream. `make web` (Vite dev server with a proxy to the API) and `make app` (build
+> `web/dist`, then FastAPI serves it with the API). Claude may scaffold; the user reviews and explains it back."
 
-> **4d UI:** "Small Next.js app in `web/`: upload PDF, type request, show JSON with each quote
-> highlighted and needs_review badges. Deploy on Vercel; API key held server-side. Claude may
-> scaffold; the user reviews and explains it back."
+> **4c2 UI review + demo:** "Needs 4c. react-pdf pane (pdf.js eval off) with our highlight overlay: click a row,
+> scroll to its page, pulse its boxes. Review modal for '!' rows (why flagged, quotes, Accept / Edit / Not found ->
+> `POST /v1/reviews`), Passed when all are resolved. One Playwright e2e on one sample. Record the demo video for the
+> write-up. Claude may scaffold; the user reviews and explains it back."
 
 ---
 
@@ -527,7 +567,8 @@ passes a mock interview.
 > **5 Write-up + interview:** "Final figures from DuckDB (per-field P/R, parser quality vs cost,
 > retry lift), each citing its run_id, and a mermaid diagram. Guide me through the README
 > narrative (problem, data choice, architecture, results, trade-offs, failures, next, including
-> the router as future work). I write it. Then act as a hiring manager: 10 hard questions one at
+> the router and "putting it online" (auth, limits, spend cap, Postgres, Docker, CI) as future work),
+> with the demo video from 4c2. I write it. Then act as a hiring manager: 10 hard questions one at
 > a time (deploy, monitoring, security, scaling), no help, grade at the end with gaps to study.
 > Then tick checklist items in ../PLAN.md."
 
@@ -539,5 +580,5 @@ passes a mock interview.
 - Every number in the README traces to a `run_id` in DuckDB and an entry in `EXPERIMENTS.md`.
 - Reproducibility: fresh clone -> `uv sync` -> `make data` -> `run --split test ...` reproduces
   the final table.
-- Live: `curl -F pdf=@sample.pdf -F request="parties and renewal term" $URL/v1/extract` (with API
-  key) returns cited JSON.
+- Local: `make app`, then `curl -F sample_id=kubient -F request="parties and renewal term"
+  localhost:8000/v1/extract` returns cited JSON, and the UI shows the same answer with highlights.

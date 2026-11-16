@@ -22,7 +22,7 @@ Document intelligence pipeline: CUAD contract PDFs → cited, validated JSON. Le
 - Every experiment run: `run_id` in DuckDB + entry in `EXPERIMENTS.md`.
 
 ## Stack
-Python 3.12, uv, pytest, ruff, Jupyter · OpenRouter (open-weight: DeepSeek V4 Flash for extraction, a vision LLM chosen in 3a3; `response_format: json_schema`, `require_parameters: true`) · Pydantic · pypdf / Docling / vision LLM parsers · DuckDB (offline evals) · Postgres/Neon (prod log) · Arize Phoenix · FastAPI · Docker · GCP Cloud Run · Next.js on Vercel · GitHub Actions.
+Python 3.12, uv, pytest, ruff, Jupyter · OpenRouter (open-weight: DeepSeek V4 Flash for extraction, a vision LLM chosen in 3a3; `response_format: json_schema`, `require_parameters: true`) · Pydantic · pypdf / Docling / vision LLM parsers · DuckDB (evals + app requests/reviews) · Arize Phoenix (local) · FastAPI (serves the API and the React + Vite + daisyUI app). Local only, one user: no auth, rate limit, spend cap, Docker, CI or deploy work (README future work). Prefer popular, maintained, low-vulnerability libraries (check npm/PyPI + OSV).
 
 ## Layout
 Standard layout (see `PLAN.md`): `src/docintel/{core,domain,evals,api,db}` · `web/` · `evals/mini/` · `learn/` · `notebooks/` · `tests/` · `data/` (gitignored).

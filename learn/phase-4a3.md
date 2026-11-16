@@ -1,464 +1,406 @@
-# Phase 4a3: API key, rate limit and spend cap
+# Phase 4a3: highlights and a live stream
 
-In this part, you put three guards in front of the extract route: who may call, how often, and how much money a day.
-Each guard runs before the first paid call. Each one is compared to Express, and each has a checkpoint.
+In this part, you give the UI the two things it needs from the video. First, where each quote is on the page, so a
+click can highlight it. Second, a live stream of the real steps, so the user watches "Analyzing" move forward.
 
-This is part 3 of 3 for Phase 4a. It needs 4a2. Every checkpoint in this part is free.
+This is part 3 of 3 for Phase 4a. It needs 4a2. The paid checkpoint costs about $0.0007.
 
 ## Words used in this part
 
-Read these first. Route, dependency and status code are from 4a2.
+Read these first. Route and dependency are from 4a2.
 
-- **API key**: a secret string a client sends with each request, to prove it may call. Example: `X-API-Key: ...`.
-- **Header**: a named line of text sent with an HTTP request. Example: `X-API-Key: dev-key-123`.
-- **Fail closed**: when a setting is missing, refuse everything. The opposite, "fail open", lets everyone in.
-- **Constant-time compare**: a string compare that takes the same time whether the first or the last letter differs.
-  It stops an attacker from guessing a key one letter at a time.
-- **Rate limit**: the most requests one client may send in a time window. Example: 10 per minute per IP.
-- **Sliding window**: count the requests in the last 60 seconds, from now. Not "since the start of the minute".
-- **Proxy**: a server between the client and your app. On Cloud Run, Google's front end is one.
-- **`X-Forwarded-For`**: a header where proxies write the client's IP. Example: `6.6.6.6, 1.2.3.4`.
-- **Spend cap**: the most money the API may spend in one day.
-- **Reservation**: money set aside for a request before it runs, at its worst case. The real cost replaces it after.
-- **Lock**: lets only one thread at a time change a shared value. Example: two requests adding to `spent`.
+- **Text layer**: the letters stored inside a PDF (3b). A scan has none.
+- **Char box**: the small rectangle that one letter fills on the page. Example: `(318.9, 772.5, 324.1, 780.1)`.
+- **PDF point**: the unit of a PDF page, 1/72 of an inch. A letter page is 612 by 792 points.
+- **Bottom-left origin**: in a PDF, `y = 0` is the bottom of the page. On a screen, `y = 0` is the top.
+- **Highlight**: the page number and the boxes that cover one quote, one box per line.
+- **SSE (server-sent events)**: one HTTP response that stays open, and sends small text messages as things happen.
+  Example: `event: stage` then `data: {"name": "parse"}`.
+- **Callback**: a function you pass in, which the code calls when something happens. Example: `on_event("plan", ...)`.
+- **Queue**: a line of items. One side puts items in, the other side takes them out, in order.
 
 ## Objectives
 
 By the end of this part you should be able to:
 
-1. Check an API key in a dependency, and say why the server refuses all calls when no key is set.
-2. Build a per-IP sliding-window rate limit, and say which IP to trust behind a proxy.
-3. Compute the worst cost of one request before any paid call.
-4. Reserve that worst case, and give it back with the real cost, even when the request fails.
-5. Say what breaks when the API runs on two Cloud Run instances, and which later part fixes it.
+1. Turn a quote into a page number and line boxes, from the PDF's text layer.
+2. Explain why a raised quote mark can split a line, and how the code keeps it whole.
+3. Report the pipeline's real steps through a callback, with no HTTP inside `domain/`.
+4. Send those steps as SSE from a thread to the browser, with the same input checks as `/v1/extract`.
+5. Say what the UI will do with a highlight, including the flip of the y axis.
 
 ## Dependencies
 
-You install nothing new. This part needs:
+New library (checked on PyPI and OSV: maintained, 0 open advisories):
 
-- 4a2: the app, `run_pipeline`, `conftest.py`.
-- 4a: `PLAN_MAX_TOKENS`, and `provider_price` in `core/llm.py`.
-- 3a3: the idea of `Budget`: check the worst case, then add the real cost.
+- `sse-starlette`: sends SSE from FastAPI. In Express, you would write `res.write("event: ...\n\n")` by hand.
+
+This part needs:
+
+- 4a2: `KNOWN_ERRORS`, `as_http`, `read_input`, `conftest.py`, the samples.
+- 3a3: `pypdfium2`, already installed. 2a: the word rule of the citation check.
 
 ## The big picture
 
-Before this part, anyone who knew the URL could spend your OpenRouter money.
+Before this part, the API answered once, at the end, with quotes as plain text.
 
 After this part:
 
 ```text
-request -> rate limit (per IP) -> API key -> route checks -> parse
-                                                               |
-                    reserve worst cost (daily cap) -> plan -> extract -> settle the real cost
+POST /v1/extract/stream
+   event: stage   {"name": "parse", "status": "start"}
+   event: stage   {"name": "parse", "status": "done", "parser": "pypdf"}
+   event: plan    {"fields": [...], "unknown": [...]}
+   event: attempt {"n": 0, "errors": 0}
+   event: result  {... "highlights": [{"page": 1, "rects": [[318.9, 772.5, 398.5, 780.1]]}] ...}
 ```
 
-- **4b** moves the spend count to Postgres, so all instances share one number.
-- **4c** keeps the key in Secret Manager, and sets a credit limit on the OpenRouter key itself.
-- **4d** keeps the API key on the server side of the UI, never in the browser.
+- **4c** turns the `stage` events into daisyUI `steps`, and reveals the rows when `result` arrives.
+- **4c2** draws each highlight box over the PDF page, and scrolls to it when a row is clicked.
+- **4b** adds a trace span around each of these same steps.
 
 ## Remember this
 
-> Every guard runs before money is spent. Check who is calling, how often, and how much this request could cost.
-> Reserve the worst case, so ten requests at the same moment cannot pass the cap. Pay the real cost after, in a
-> `finally`, so a failed request still counts.
+> A quote is useful in the UI only if it points at the page. The text layer knows where every letter is, so the same
+> word rule as the citation check can find the quote, and its letter boxes become one box per line. The steps are
+> reported through a plain callback, so the pipeline still knows nothing about HTTP.
 >
-> **Who, how often, how much: before the first paid call.**
+> **Find the words, keep their boxes, report the steps.**
 
 ## Why
 
-**A public URL is found.** Bots scan the internet for open APIs. Without a key, the first one spends your credit.
+**A cited answer must be checkable in one click.** A lawyer does not want to search the PDF for a quote. The box shows
+it at once.
 
-**A key is not enough.** A user with a valid key can still send a request in a loop by mistake.
+**Waiting with no news feels broken.** An extraction takes 6 to 35 seconds. Real steps, shown as they happen, tell
+the user that work is going on.
 
-**Money needs its own guard.** The rate limit counts requests, not dollars. A 100-page contract costs much more than a
-2-page one.
+**The rows are revealed, not computed one by one.** Extraction is one call for 12 fields. The stream sends the real
+steps, and the UI reveals the rows when the answer arrives. The doc says so, so the demo stays honest.
 
 ## Design decisions
 
-- **The rate limit runs before the key check.** Wrong-key attempts are counted too, so nobody can guess keys quickly.
-  Other option: key first. Guessing would have no limit.
-- **No key set on the server means 503 for everyone.** A missing setting must not open the door. Other option: no key
-  means no check. One missing line in production would make the API public.
-- **`secrets.compare_digest`, not `==`.** It takes the same time for any wrong key. Other option: `==`. It stops at the
-  first different letter, and that time can be measured.
-- **The IP is the last `X-Forwarded-For` entry.** A client can write any first entry. The proxy adds the real one at
-  the end. Other option: the first entry. Anyone could pick a new IP for each request. Check this on Cloud Run in 4c.
-- **Reserve the worst case, not "check what was spent".** Ten requests that start at once would all see "spent: $0".
-  Other option: check `spent` only. That is the 3a3 lesson again: the check passes, then the calls pass the limit.
-- **Settle in `finally`.** A request that fails after the plan call still paid for it. Other option: settle only on
-  success. The cap would miss exactly the expensive failures.
-- **All state in memory, with a lock.** It is simple, and it is correct on one instance. Other option: Postgres now.
-  That is 4b's job. For now, the OpenRouter key's credit limit (4c) is the backup for many instances.
-- **The spend cap lives in `core/`.** The pipeline uses it, and `domain/` must not import `api/`. Other option: put it
-  in `api/limits.py`. Then the eval runner could not use the pipeline without the web code.
-- **Cap reached is 503, rate limit is 429.** 429 means "you, slow down". 503 means "the service is closed for today,
-  for everyone". Other option: 429 for both. A client would retry, and the cap would refuse it again.
+- **Boxes come from pypdfium2's char boxes.** It is already installed, and it gives one box per letter. Other option:
+  search in pdf.js in the browser. The browser would need its own copy of the word rule.
+- **The same word rule as the citation check.** Lowercase words and numbers only. A quote that passes
+  `quote_status` can be found here too. Other option: exact text search. One extra space would miss it.
+- **One box per line.** A new line starts when the text goes back to the left, or stops overlapping from top to bottom.
+  Other option: group by the bottom of each box. A raised quote mark then splits one line into three boxes.
+- **Points with a bottom-left origin, plus the page size.** The UI can scale to any width, and flip y with one line.
+  Other option: send pixels. They depend on the screen.
+- **Scans get no boxes.** They have no text layer. The UI still shows the quote, and jumps to the page later if OCR
+  boxes are added. Other option: OCR boxes now. That is a bigger change to the parsers.
+- **`on_event` is a plain callback, default "do nothing".** The eval runner never sees it. Other option: pass the HTTP
+  response into the pipeline. Then `domain/` would depend on the web.
+- **A queue between the thread and the response.** The pipeline runs in a thread, the stream is `async`.
+  `call_soon_threadsafe` is the safe way to hand an event over. Other option: put into the queue from the thread
+  directly. `asyncio` objects are not thread-safe.
+- **The stream reuses `KNOWN_ERRORS`, as an `error` event.** The status code of a stream is already 200 when an error
+  happens, so the error goes inside it. Other option: close the stream with no reason.
 
 ## Worked example
 
 All numbers are real. Guess before you open each box.
 
-### Round 1: what does one request reserve?
+### Round 1: how many boxes for a short quote?
 
-Kubient is 2 pages, 7,590 characters. Its real requests cost $0.00067 and $0.00095. Guess the worst case, with the
-4a and 4a2 token limits and 2 retries.
+The quote is `Kubient, Inc. ("Kubient")`, on one line of page 1. The first version grouped letters by the bottom of
+their boxes. Guess how many boxes it gave.
 
 <details><summary>Guess, then open</summary>
 
 ```text
-7590 chars, worst $0.0282
+[(318.9, 772.5, 367.8, 780.1), (368.6, 777.5, 370.9, 779.9), (371.7, 774.2, 398.5, 780.1)]
 ```
 
-About 30 to 40 times the real cost. Every attempt may write 20,000 tokens, and each retry sends back the last answer.
-It looks too careful. But one real call wrote 17,999 tokens (4a2), and a Kimi call once wrote 131,072 (3a3).
+Three. The `"` sits high on the line, so its box starts 5 points higher. The fix asks "is it to the right, and does it
+overlap from top to bottom?". Then the answer is one box: `(318.9, 772.5, 398.5, 780.1)`.
 </details>
 
-### Round 2: how many requests fit under a $1 cap?
+### Round 2: will every quote get a box?
 
-With $1.00 a day and this contract, guess how many requests can run **at the same moment**. Then guess how many can
-run in a day.
+The 9 text samples hold 158 gold label quotes. Guess how many `locate` finds.
 
 <details><summary>Guess, then open</summary>
 
-At the same moment: 35 ($1.00 / $0.0282). After each request, the reservation is replaced by the real cost, about
-$0.0008. So in a day: more than 1,000 such requests. The worst case limits how many run together, not how many run in
-total.
+```text
+gold quotes with boxes: 156 of 158
+```
+
+156, the same count as pypdf in E3 (156/158), but **not the same quotes**:
+
+- pypdf missed two dates in EcoScience, written "1st" with a small raised "st". pdfium reads them, so `locate` finds
+  them.
+- `locate` misses two quotes (iVillage, Variable Separate Account) that run across a page break. Their words match the
+  whole document, but no single page. `locate` looks at one page at a time (see Gotchas).
+
+Same count, different reasons. Always look at the misses, not only the number.
 </details>
 
-### Round 3: what does `X-Forwarded-For` look like?
+### Round 3: where does the box go on the screen?
 
-A client sends `X-Forwarded-For: 6.6.6.6` itself. The proxy adds the real address. The app receives
-`6.6.6.6, 1.2.3.4`. Guess which one is real.
+A box is `(318.9, 772.5, 398.5, 780.1)` on a page of `(595, 842)` points. The UI shows the page 1,190 pixels wide.
+Guess the top of the box on the screen, in pixels.
 
 <details><summary>Guess, then open</summary>
 
-`1.2.3.4`, the last one. The client wrote the first one, so it proves nothing. In Express, this is
-`app.set("trust proxy", 1)`: trust one proxy, so take one entry from the right.
+The scale is 1190 / 595 = 2. A PDF counts y from the bottom, the screen from the top. So the top is
+(842 - 780.1) * 2 = **123.8 px**, and the left is 318.9 * 2 = 637.8 px. 4c2 does exactly this.
 </details>
 
 ## Project setup
 
 ```sh
-touch src/docintel/api/auth.py src/docintel/api/limits.py src/docintel/core/spend.py
-touch tests/test_limits.py
+uv add sse-starlette
+touch src/docintel/domain/locate.py
+touch tests/test_stream.py
 ```
 
 You should now have:
 
 ```text
-src/docintel/
-├── api/
-│   ├── auth.py          # new: API key
-│   └── limits.py        # new: rate limit, the process's spend cap
-└── core/
-    └── spend.py         # new: DailySpend
+src/docintel/domain/
+└── locate.py        # new: quote -> page and line boxes
 tests/
-└── test_limits.py       # new
+└── test_stream.py   # new
 ```
 
-## Step 1: the numbers (your decision)
+## Step 1: find the quote's words on a page
 
-**Why.** The guards need numbers, and they are yours to set.
+**Why.** Everything else starts from "which letters are this quote?".
 
-| Choice | Evidence |
-|---|---|
-| Requests per IP per minute | one request takes 6 to 35 s (4a2). A person rarely sends more than a few a minute |
-| Daily cap | worst case for a 2-page contract: $0.0282. Real cost: under $0.001 |
-| Which IP to trust | Round 3. Cloud Run puts one Google proxy in front |
-
-Write your values in `EXPERIMENTS.md`, under `## API limits (4a2)`.
-
-<details><summary>Reference (open after you write yours)</summary>
-
-10 requests per IP per minute. $1.00 a day. The last `X-Forwarded-For` entry, to be checked on Cloud Run in 4c.
-</details>
-
-Update `Settings` in `src/docintel/core/config.py`. Add three lines after `llm_max_attempts`:
+Put this in `src/docintel/domain/locate.py`:
 
 ```python
-    docintel_api_key: SecretStr | None = None  # the key clients send; without it the API refuses
-    docintel_daily_cap_usd: float = 1.00
-    docintel_rate_limit: int = 10  # requests per IP per minute
+"""Where is a quote on the page? Line boxes from the text layer, so the UI can highlight it."""
+
+import re
+from pathlib import Path
+
+import pypdfium2 as pdfium
+from pydantic import BaseModel
+
+WORD = re.compile(r"[a-z0-9]+")  # the same word rule as `citations.words`
+
+
+Rect = tuple[float, float, float, float]  # x0, y0, x1, y1 in PDF points; (0, 0) is bottom left
+
+
+class Highlight(BaseModel):
+    quote_index: int
+    page: int  # from 1
+    page_size: tuple[float, float]
+    rects: list[Rect]
+
+
+def find_span(quote: list[str], words: list[str]) -> tuple[int, int] | None:
+    """The first and last word index of `quote` inside `words`, side by side. None if absent."""
+    n = len(quote)
+    for start in range(len(words) - n + 1):
+        if words[start : start + n] == quote:
+            return start, start + n - 1
+    return None
 ```
 
-Make a key, and add it to `.env`:
-
-```sh
-uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-```text
-<43 random characters>
-```
-
-```text
-DOCINTEL_API_KEY=<the key you just made>
-```
-
-The key is a secret, like `sk-or-v1-...`. `.env` is not in git. 4c moves it to Secret Manager.
-
-## Step 2: the API key
-
-**Why.** Only callers with the key may spend money.
-
-Put this in `src/docintel/api/auth.py`:
-
-```python
-"""API-key check. Like an Express middleware that runs before the route."""
-
-import secrets
-from typing import Annotated
-
-from fastapi import HTTPException, Security
-from fastapi.security import APIKeyHeader
-
-from docintel.core.config import get_settings
-
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-def require_api_key(key: Annotated[str | None, Security(api_key_header)]) -> None:
-    expected = get_settings().docintel_api_key
-    if expected is None:  # fail closed: a server with no key set answers nobody
-        raise HTTPException(503, "the server has no API key set")
-    if key is None or not secrets.compare_digest(
-        key.encode(), expected.get_secret_value().encode()
-    ):
-        raise HTTPException(401, "missing or wrong API key")
-```
-
-*Python here: [`Security` and `APIKeyHeader`](./py/phase-4a3.md#py-1).*
-
-Here, in order:
-
-1. Read the `X-API-Key` header. `auto_error=False` lets us choose the error message.
-2. If the server has no key, refuse with 503.
-3. If the key is missing or wrong, refuse with 401. Compare in constant time.
-
-In Express, this is a middleware: `(req, res, next) => req.get("X-API-Key") === key ? next() : res.status(401)...`.
-
-## Step 3: the rate limit
-
-**Why.** One client must not use the whole API.
-
-Put this in `src/docintel/api/limits.py`:
-
-```python
-"""Per-IP rate limit, and the one spend cap of this process. Both live in memory."""
-
-import threading
-import time
-from collections import defaultdict, deque
-from functools import lru_cache
-
-from fastapi import HTTPException, Request
-
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend
-
-WINDOW_S = 60
-
-
-class RateLimiter:
-    """At most `max_requests` per key in the last `window_s` seconds (a sliding window)."""
-
-    def __init__(self, max_requests: int, window_s: float = WINDOW_S, clock=time.monotonic):
-        self.max_requests = max_requests
-        self.window_s = window_s
-        self.clock = clock
-        self.hits: dict[str, deque[float]] = defaultdict(deque)
-        self.lock = threading.Lock()
-
-    def allow(self, key: str) -> bool:
-        now = self.clock()
-        with self.lock:
-            hits = self.hits[key]
-            while hits and hits[0] <= now - self.window_s:
-                hits.popleft()
-            if len(hits) >= self.max_requests:
-                return False
-            hits.append(now)
-            return True
-
-
-@lru_cache
-def get_rate_limiter() -> RateLimiter:
-    return RateLimiter(get_settings().docintel_rate_limit)
-
-
-def client_ip(request: Request) -> str:
-    """The caller's IP. Behind Cloud Run, the last X-Forwarded-For entry is the one Google added."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
-    return request.client.host if request.client else "unknown"
-
-
-def rate_limit(request: Request) -> None:
-    if not get_rate_limiter().allow(client_ip(request)):
-        raise HTTPException(429, "too many requests", headers={"Retry-After": str(WINDOW_S)})
-```
-
-*Python here: [`deque`, `defaultdict` and a lock](./py/phase-4a3.md#py-2).*
-
-Here, in `allow`, for one IP:
-
-1. Read the clock.
-2. Drop every request older than the window, from the front of the queue.
-3. If the queue is full, say no.
-4. If not, add now to the queue, and say yes.
-
-`clock` is an argument, so a test can move time forward with no waiting.
-
-`limits.py` also has `get_spend`, for Step 5. Add it now, at the bottom:
-
-```python
-@lru_cache
-def get_spend() -> DailySpend:
-    return DailySpend(get_settings().docintel_daily_cap_usd)
-```
-
-It needs `core/spend.py`, so the app will not start until Step 4 is done.
-
-## Step 4: the spend cap
-
-**Why.** A count of requests is not a count of dollars.
-
-Put this in `src/docintel/core/spend.py`:
-
-```python
-"""A daily spend cap, shared by every request of one process."""
-
-import threading
-from datetime import UTC, datetime
-from functools import lru_cache
-
-from docintel.core.llm import provider_price
-
-
-class SpendCapReached(RuntimeError):
-    pass
-
-
-class DailySpend:
-    """Money for one UTC day. A request reserves its worst case first, then pays the real cost."""
-
-    def __init__(self, cap_usd: float, today=lambda: datetime.now(UTC).date()):
-        self.cap_usd = cap_usd
-        self.today = today
-        self.day = today()
-        self.spent = 0.0
-        self.reserved = 0.0
-        self.lock = threading.Lock()
-
-    def _new_day(self) -> None:
-        if self.today() != self.day:
-            self.day, self.spent = self.today(), 0.0
-
-    def reserve(self, worst_usd: float) -> None:
-        """Stop before a request that could pass the cap."""
-        with self.lock:
-            self._new_day()
-            if self.spent + self.reserved + worst_usd > self.cap_usd:
-                raise SpendCapReached(
-                    f"spent ${self.spent:.4f} today, reserved ${self.reserved:.4f}, "
-                    f"this request could cost ${worst_usd:.4f}, cap ${self.cap_usd:.2f}"
-                )
-            self.reserved += worst_usd
-
-    def settle(self, worst_usd: float, cost_usd: float) -> None:
-        """Give back the reservation, and count what was really paid."""
-        with self.lock:
-            self.reserved -= worst_usd
-            self.spent += cost_usd
-
-
-@lru_cache
-def price(model: str) -> tuple[float, float]:
-    """The provider's price per token, read once per process. Free, no key needed."""
-    return provider_price(model)
-```
-
-*Python here: [`lambda` as a default clock](./py/phase-4a3.md#py-3).*
+*Python here: [a type alias, and `tuple` in a model](./py/phase-4a3.md#py-1).*
 
 Here, we:
 
-1. Start a new day at midnight UTC. `spent` goes back to 0, and the reservations of running requests stay.
-2. In `reserve`, refuse if spent plus reserved plus this worst case passes the cap.
-3. In `settle`, give back the reservation, and add the real cost.
-4. Read the provider's price once per process. It is the same price as in 3a3 and 4a.
+1. Use the same word pattern as `citations.words`: lowercase letters and numbers.
+2. Describe a highlight: which quote, which page, the page size, and the line boxes.
+3. In `find_span`, slide along the page's words, and return the first and last word index of the quote.
 
-## Step 5: reserve before the first paid call
+## Step 2: letters to line boxes
 
-**Why.** The pipeline is where the money is spent, so it is where the cap is checked.
+**Why.** A quote can cover three lines. The UI needs one box per line, not one per letter.
 
-Update the imports at the top of `src/docintel/domain/pipeline.py`. Add these two, and `PLAN_MAX_TOKENS`:
+Add to the bottom of `src/docintel/domain/locate.py`:
 
 ```python
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend, price
-from docintel.domain.planner.planner import PLAN_MAX_TOKENS, pick, plan_request
+def same_line(line: list[float], box: Rect) -> bool:
+    """A box is on the current line if it is to the right and overlaps it from top to bottom."""
+    x0, y0, _, y1 = box
+    return x0 >= line[2] - 1 and y0 < line[3] and y1 > line[1]
+
+
+def line_rects(boxes: list[Rect]) -> list[Rect]:
+    """Join char boxes into one box per line, in reading order."""
+    lines: list[list[float]] = []
+    for box in boxes:
+        if lines and same_line(lines[-1], box):
+            line = lines[-1]
+            line[1], line[2], line[3] = min(line[1], box[1]), box[2], max(line[3], box[3])
+        else:
+            lines.append(list(box))
+    return [tuple(round(v, 1) for v in line) for line in lines]
+
+
+def locate(pdf_path: Path, quotes: list[str]) -> list[Highlight]:
+    """One Highlight per quote found in the text layer. A quote that is not found is skipped."""
+    wanted = [(i, WORD.findall(q.lower())) for i, q in enumerate(quotes)]
+    found = []
+    pdf = pdfium.PdfDocument(pdf_path)
+    for page_no, page in enumerate(pdf, start=1):
+        text_page = page.get_textpage()
+        text = text_page.get_text_range()
+        spans = [(m.start(), m.end()) for m in WORD.finditer(text.lower())]
+        words = [text[a:b].lower() for a, b in spans]
+        for i, quote in wanted:
+            span = find_span(quote, words) if quote else None
+            if span is None:
+                continue
+            first, last = spans[span[0]][0], spans[span[1]][1]
+            boxes = [text_page.get_charbox(k) for k in range(first, last) if not text[k].isspace()]
+            found.append(
+                Highlight(
+                    quote_index=i, page=page_no, page_size=page.get_size(), rects=line_rects(boxes)
+                )
+            )
+        wanted = [(i, q) for i, q in wanted if i not in {h.quote_index for h in found}]
+    pdf.close()
+    return sorted(found, key=lambda h: h.quote_index)
 ```
 
-Add two numbers below `EXTRACT_MAX_TOKENS` in the same file:
+Here, in `locate`, for each page, in order:
 
-```python
-CHARS_PER_TOKEN = 3  # a low guess, so the worst case is high
-PROMPT_TOKENS = 1_500  # the v1 system prompt and the retry message, with room to spare
+1. Read the page text, and the start and end of every word in it.
+2. For each quote not found yet, look for its words.
+3. Take the char boxes from the first to the last letter, and skip spaces.
+4. Join them into line boxes, and keep the page size.
+5. Stop looking for a quote once it is found.
+
+Checkpoint (free):
+
+```sh
+uv run python - <<'EOF'
+from docintel.api.samples import sample_pdf
+from docintel.domain.locate import locate
+
+quotes = [
+    'Kubient, Inc. ("Kubient")',
+    "Customer agrees not to work with, directly or indirectly, any Third-Party",
+    "this sentence is not in the contract",
+]
+for h in locate(sample_pdf("kubient"), quotes):
+    print(h.quote_index, "page", h.page, h.page_size, h.rects)
+print("scan:", locate(sample_pdf("kubient-scan"), quotes))
+EOF
 ```
 
-Add `worst_cost` above `run_pipeline`:
-
-```python
-def worst_cost(text: str, in_price: float, out_price: float, retries: int = 2) -> float:
-    """The most one request can cost: the plan, then every extraction attempt at its limit."""
-    base = len(text) / CHARS_PER_TOKEN + PROMPT_TOKENS
-    tokens_in = sum(base + k * EXTRACT_MAX_TOKENS for k in range(retries + 1))  # a retry resends
-    tokens_out = (retries + 1) * EXTRACT_MAX_TOKENS
-    plan = PROMPT_TOKENS * in_price + PLAN_MAX_TOKENS * out_price
-    return plan + tokens_in * in_price + tokens_out * out_price
+```text
+0 page 1 (595.0, 842.0) [(318.9, 772.5, 398.5, 780.1)]
+1 page 1 (595.0, 842.0) [(389.8, 610.9, 545.0, 618.5), (50.3, 600.8, 139.6, 608.4)]
+scan: []
 ```
 
-Here, for each of the 3 attempts, we count:
+The second quote runs over two lines, so it has two boxes. The third is not in the contract, so it is skipped. The scan
+has no text layer.
 
-1. The contract and the prompts, at 3 characters per token. That is a low guess, so the cost is high.
-2. Each retry sends back the last answer, so attempt `k` sends `k` more full answers.
-3. Every attempt writes up to `EXTRACT_MAX_TOKENS`. The plan call adds its own worst case.
+Checkpoint (free): every gold quote of the 9 text samples.
 
-Now replace `run_pipeline` with this version:
+```sh
+uv run python - <<'EOF'
+from docintel.api.samples import load_samples, sample_pdf
+from docintel.domain.locate import locate
+from docintel.evals.store import connect
+
+found = total = 0
+with connect() as con:
+    for s in load_samples().values():
+        if s.scan:
+            continue
+        spans = [t for (t,) in con.execute(
+            "SELECT span_text FROM labels WHERE doc_id = ? AND is_present AND span_text IS NOT NULL", [s.doc_id]
+        ).fetchall()]
+        found += len(locate(sample_pdf(s.id), spans))
+        total += len(spans)
+print("gold quotes with boxes:", found, "of", total)
+EOF
+```
+
+```text
+gold quotes with boxes: 156 of 158
+```
+
+## Step 3: report the steps, and add the boxes to the answer
+
+**Why.** The UI needs to know what the pipeline is doing, and where each quote is.
+
+In `src/docintel/domain/extract/retry.py`, add one argument to `extract_with_retry`, after `max_tokens`:
 
 ```python
+    on_attempt=None,
+```
+
+And call it right after `attempts.append(attempt)`:
+
+```python
+        if on_attempt:
+            on_attempt(attempt)
+```
+
+In `src/docintel/domain/pipeline.py`, update the imports:
+
+```python
+from collections.abc import Callable
+
+from docintel.domain.locate import Highlight, locate
+```
+
+Add one field at the end of `FieldResult`:
+
+```python
+    highlights: list[Highlight] = []  # empty for a scan, or a quote not found in the text layer
+```
+
+Then add the callback type above `run_pipeline`, and replace `run_pipeline`:
+
+```python
+Emit = Callable[[str, dict], None]  # (event name, data); the API turns these into SSE events
+
+
+def no_events(event: str, data: dict) -> None:
+    pass
+
+
 def run_pipeline(
-    pdf_path: Path, request: str, client=None, spend: DailySpend | None = None
+    pdf_path: Path, request: str, document: Document, client=None, on_event: Emit = no_events
 ) -> ExtractResult:
-    """Parse, reserve the worst cost, plan, extract with retries, check, keep the asked fields."""
+    """Parse, plan, extract with retries, check, keep the asked fields. Reports each step."""
     start = time.perf_counter()
+    on_event("stage", {"name": "parse", "status": "start"})
     doc = parse_pdf(pdf_path)
-    spend = spend or DailySpend(float("inf"))
-    worst = worst_cost(doc.text, *price(get_settings().docintel_model))
-    spend.reserve(worst)  # raises SpendCapReached before any paid call
-    costs = []
-    try:
-        plan, plan_call = plan_request(request, client=client)
-        costs.append(plan_call.cost_usd if plan_call else 0.0)
-        if not plan.fields:
-            raise NothingToExtract(f"no known field in the request; unknown: {plan.unknown}")
-        attempts = extract_with_retry(doc.text, client=client, max_tokens=EXTRACT_MAX_TOKENS)
-        costs += [a.result.cost_usd for a in attempts]
-    finally:
-        spend.settle(worst, sum(c or 0.0 for c in costs))
+    on_event("stage", {"name": "parse", "status": "done", "parser": doc.parser_name})
+    on_event("stage", {"name": "plan", "status": "start"})
+    plan, plan_call = plan_request(request, client=client)
+    on_event("plan", {"fields": plan.fields, "unknown": plan.unknown})
+    if not plan.fields:
+        raise NothingToExtract(f"no known field in the request; unknown: {plan.unknown}")
+    on_event("stage", {"name": "extract", "status": "start"})
+    attempts = extract_with_retry(
+        doc.text,
+        client=client,
+        max_tokens=EXTRACT_MAX_TOKENS,
+        on_attempt=lambda a: on_event("attempt", {"n": a.attempt_no, "errors": len(a.errors)}),
+    )
     answer = final_answer(attempts)
     if answer is None:
         raise ValueError("the model gave no answer that fits the schema")
+    on_event("stage", {"name": "check", "status": "start"})
     issues = check_answer(answer, doc.text)  # rule errors and review warnings
     picked = pick(answer, plan.fields)
     fields = {}
     for name in plan.fields:
         own = [i for i in issues if i.field == name]
         answer_part = getattr(picked, name).model_dump()
-        fields[name] = FieldResult(**answer_part, needs_review=bool(own), issues=own)
+        boxes = locate(pdf_path, answer_part["quotes"]) if doc.parser_name == "pypdf" else []
+        fields[name] = FieldResult(
+            **answer_part, needs_review=bool(own), issues=own, highlights=boxes
+        )
+    costs = [a.result.cost_usd for a in attempts] + [plan_call.cost_usd if plan_call else 0.0]
     return ExtractResult(
         request_id=str(uuid.uuid4()),
+        document=document,
         fields=fields,
         unknown=plan.unknown,
         needs_review=any(f.needs_review for f in fields.values()),
@@ -469,385 +411,319 @@ def run_pipeline(
     )
 ```
 
-*Python here: [`try` and `finally`](./py/phase-4a3.md#py-4).*
+*Python here: [`Callable`, and a lambda that calls a callback](./py/phase-4a3.md#py-2).*
 
-Here, the new part, in order:
+Here, the new parts, in order:
 
-1. Parse. It is free (pypdf) or local (Docling).
-2. Compute the worst cost, and reserve it. If the cap would be passed, `SpendCapReached` stops the request here.
-3. Plan and extract, and collect the cost of each call.
-4. In `finally`, settle: give back the reservation, and add what was really paid. This runs on success and on
-   failure.
+1. Report `stage` events at the start and end of parsing, and at the start of plan, extract and check.
+2. Report the `plan` as soon as it is known. The UI can draw the right number of rows.
+3. Report each `attempt`, so a retry is visible.
+4. For a text PDF, find the boxes of each quote of each returned field.
 
-Checkpoint (free):
+## Step 4: the stream route
 
-```sh
-uv run python - <<'EOF'
-from pathlib import Path
+**Why.** The browser needs the events while the work is running, not at the end.
 
-from docintel.core.spend import price
-from docintel.domain.pipeline import parse_pdf, worst_cost
-
-doc = parse_pdf(Path("data/kubient.pdf"))
-print(len(doc.text), "chars,", f"worst ${worst_cost(doc.text, *price('deepseek/deepseek-v4-flash')):.4f}")
-EOF
-```
-
-```text
-7590 chars, worst $0.0282
-```
-
-## Step 6: put the guards on the route
-
-**Why.** The guards exist. Now the route must use them.
-
-Update the imports at the top of `src/docintel/api/routes.py`:
+In `src/docintel/api/routes.py`, update the imports:
 
 ```python
-from docintel.api.auth import require_api_key
-from docintel.api.limits import get_spend, rate_limit
-from docintel.api.schemas import Health
-from docintel.core.spend import DailySpend, SpendCapReached
+import json
+import shutil
+
+from sse_starlette import EventSourceResponse
 ```
 
-Then update the start of `extract` in the same file:
+Add to the bottom of `src/docintel/api/routes.py`:
 
 ```python
-@router.post("/v1/extract", dependencies=[Depends(rate_limit), Depends(require_api_key)])
-async def extract(
-    pdf: UploadFile,
+@router.post("/v1/extract/stream")
+async def extract_stream(
     client: Annotated[object, Depends(get_llm_client)],
-    spend: Annotated[DailySpend, Depends(get_spend)],
+    pdf: UploadFile | None = None,
+    sample_id: Annotated[str | None, Form()] = None,
     request: Annotated[str, Form()] = "",
-) -> ExtractResult:
+) -> EventSourceResponse:
+    """The same work as /v1/extract, sent as events while it runs: stage, plan, attempt, result."""
+    if len(request) > MAX_REQUEST_CHARS:
+        raise HTTPException(422, f"the request is over {MAX_REQUEST_CHARS} characters")
+    data, document = await read_input(pdf, sample_id)
+    folder = Path(tempfile.mkdtemp())
+    path = folder / "upload.pdf"
+    path.write_bytes(data)
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def emit(event: str, data: dict) -> None:  # runs in the pipeline's thread
+        loop.call_soon_threadsafe(queue.put_nowait, (event, data))
+
+    async def work() -> None:
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(run_pipeline, path, request, document, client, emit),
+                timeout=TIMEOUT_S,
+            )
+            await queue.put(("result", result.model_dump(mode="json")))
+        except tuple(KNOWN_ERRORS) as e:
+            error = as_http(e)
+            await queue.put(("error", {"status": error.status_code, "detail": error.detail}))
+        except Exception:  # a bug: say so, without the details
+            await queue.put(("error", {"status": 500, "detail": "internal error"}))
+        finally:
+            await queue.put(None)  # the end
+
+    async def events():
+        task = asyncio.create_task(work())
+        try:
+            while (item := await queue.get()) is not None:
+                name, payload = item
+                yield {"event": name, "data": json.dumps(payload)}
+        finally:
+            await task
+            shutil.rmtree(folder, ignore_errors=True)
+
+    return EventSourceResponse(events())
 ```
 
-Pass `spend` to the pipeline:
+*Python here: [a queue between a thread and `async`](./py/phase-4a3.md#py-3) · [an `async` generator](./py/phase-4a3.md#py-4).*
 
-```python
-                run_in_threadpool(run_pipeline, path, request, client, spend), timeout=TIMEOUT_S
-```
+Here, in order:
 
-And add one more error at the end of the `except` list:
+1. Check the input, and save the PDF, as in `extract`.
+2. `emit` hands each event from the pipeline's thread to the event loop, safely.
+3. `work` runs the pipeline in a thread, with the time limit. At the end it adds `result`, or one `error` event with the
+   status code from `KNOWN_ERRORS`, then `None` to say "the end".
+4. `events` takes items from the queue, in order, and sends each one as SSE. After the end, it waits for `work`, and
+   deletes the temporary folder.
 
-```python
-        except SpendCapReached as e:
-            raise HTTPException(503, f"daily spend cap reached: {e}") from None
-```
-
-Here, `dependencies=[...]` runs the two guards in order, before the route body. In Express:
-`router.post("/v1/extract", rateLimit, requireApiKey, handler)`. `/health` has no guards, so Cloud Run can always reach
-it.
-
-Checkpoint 1 (free): the key and the rate limit. Start the server with a limit of 3, so it is quick to reach:
+Checkpoint (paid, about $0.0007). Start the server with `make serve`. `-N` tells curl to print events as they come:
 
 ```sh
-DOCINTEL_API_KEY=dev-key-123 DOCINTEL_RATE_LIMIT=3 make serve
-```
-
-In a second terminal. Guess the four numbers of the last line first:
-
-```sh
-curl -s -w " %{http_code}\n" -F pdf=@data/kubient.pdf -F request=parties localhost:8000/v1/extract
-curl -s -w " %{http_code}\n" -H "X-API-Key: nope" -F pdf=@data/kubient.pdf -F request=parties localhost:8000/v1/extract
-for i in 1 2 3 4; do curl -s -o /dev/null -w "%{http_code} " -F pdf=@data/kubient.pdf -F request=parties localhost:8000/v1/extract; done; echo
+curl -s -N -F sample_id=kubient -F request="parties, renewal term, any non-compete?" localhost:8000/v1/extract/stream
 ```
 
 ```text
-{"detail":"missing or wrong API key"} 401
-{"detail":"missing or wrong API key"} 401
-401 429 429 429
+event: stage
+data: {"name": "parse", "status": "start"}
+
+event: stage
+data: {"name": "parse", "status": "done", "parser": "pypdf"}
+
+event: stage
+data: {"name": "plan", "status": "start"}
+
+event: plan
+data: {"fields": ["parties", "non_compete", "renewal_term"], "unknown": []}
+
+event: stage
+data: {"name": "extract", "status": "start"}
+
+event: attempt
+data: {"n": 0, "errors": 0}
+
+event: stage
+data: {"name": "check", "status": "start"}
+
+event: result
+data: {"request_id": "...", ...}
 ```
 
-The two refused requests at the top counted too. So only one more fits, and it is refused for its key.
-
-Checkpoint 2 (free): the cap. Stop the server, and start it with a cap smaller than one worst case:
-
-```sh
-DOCINTEL_API_KEY=dev-key-123 DOCINTEL_DAILY_CAP_USD=0.01 make serve
-```
-
-```sh
-curl -s -w " %{http_code}\n" -H "X-API-Key: dev-key-123" -F pdf=@data/kubient.pdf -F request=parties localhost:8000/v1/extract
-```
+The `result` line is long. Its fields, in short:
 
 ```text
-{"detail":"daily spend cap reached: spent $0.0000 today, reserved $0.0000, this request could cost $0.0282, cap $0.01"} 503
+parties found  [{"quote_index": 0, "page": 1, "page_size": [595.0, 842.0], "rects": [[318.9, 772.5, 398.5, 780.1]]}, {"quote_index": 1, "page": 1, "page_size": [595.0, 842.0], "rects": [[423.7, 772.5, 536.6, 780.1]]}]
+non_compete not found  []
+renewal_term not found review []
+cost 0.0006788600000000001 ms 13927 parser pypdf
 ```
 
-No call was made. The planner did not run, because the reservation comes first.
+Watch the terminal while it runs: the `extract` stage waits a few seconds, then the rest comes at once.
 
-## Step 7: a small test
+## Step 5: a small test
 
-**Why.** These rules protect the money. A broken one must fail a test, not show up on the bill.
+**Why.** Wrong boxes or a stream in the wrong order would break the UI with no error on the server.
 
-First, update the `api` fixture in `tests/conftest.py`. It now sends a key, uses its own spend cap, and never reads
-the price from the network.
-
-<details><summary>The new <code>tests/conftest.py</code></summary>
+First, add one line to the `api` fixture in `tests/conftest.py`, after the `parse_pdf` line. The fake PDF of the tests has
+no pages, so `locate` must not open it:
 
 ```python
-"""Shared fakes for the API tests: a fake OpenRouter and a fake parser. No network, no cost."""
+    monkeypatch.setattr(pipeline, "locate", lambda path, quotes: [])  # the fake PDF has no pages
+```
+
+The test names say what is protected: a quote is one box on its line, a two-line quote has two boxes, a missing quote
+and a scan give nothing, the events come in order and end with the result, and a failure ends with an error event.
+
+<details><summary>Put this in <code>tests/test_stream.py</code></summary>
+
+```python
+"""Highlights on a real sample PDF, and the event stream with the fakes from `conftest.py`."""
 
 import json
+from pathlib import Path
 
-import httpx2
-import pytest
-from fastapi.testclient import TestClient
-from openai import OpenAI
+from docintel.api.samples import SAMPLES_DIR
+from docintel.domain.locate import locate
 
-from docintel.api import routes
-from docintel.api.app import app
-from docintel.api.limits import get_rate_limiter, get_spend
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend
-from docintel.domain import pipeline
-from docintel.domain.parse.base import from_pages
-from docintel.domain.schema.fields import ContractFields
-from docintel.evals.runner import empty_answer
-
-CONTRACT = "This Agreement is made between Acme Inc. and Beta LLC."
-
-
-def contract_answer() -> dict:
-    answer = {f: empty_answer(f) for f in ContractFields.model_fields}
-    names = ["Acme Inc.", "Beta LLC"]
-    answer["parties"] = {"quotes": names, "value": names, "found": True}
-    return answer
-
-
-def fake_llm(plan: dict, sent: list) -> OpenAI:
-    """Answers a planner call with `plan`, and an extraction call with `contract_answer()`."""
-
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        schema = json.loads(request.content)["response_format"]["json_schema"]["name"]
-        sent.append(schema)
-        content = plan if schema == "Plan" else contract_answer()
-        message = {"role": "assistant", "content": json.dumps(content)}
-        body = {
-            "id": "gen-1",
-            "object": "chat.completion",
-            "created": 0,
-            "model": "fake/model",
-            "choices": [{"index": 0, "finish_reason": "stop", "message": message}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "cost": 0.001},
-        }
-        return httpx2.Response(200, json=body)
-
-    http = httpx2.Client(transport=httpx2.MockTransport(handler))
-    return OpenAI(
-        api_key="sk-or-v1-test", base_url="https://fake.test/v1", max_retries=0, http_client=http
-    )
-
-
-API_KEY = "test-key"
-
-
-@pytest.fixture
-def api(monkeypatch):
-    """`api(plan)`: a TestClient whose model answers with `plan`. `api.sent` lists the calls."""
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
-    monkeypatch.setenv("DOCINTEL_API_KEY", API_KEY)
-    get_settings.cache_clear()
-    get_rate_limiter.cache_clear()
-    monkeypatch.setattr(pipeline, "parse_pdf", lambda path: from_pages([CONTRACT], 0.0, 1, "pypdf"))
-    monkeypatch.setattr(pipeline, "price", lambda model: (1e-6, 1e-6))  # no network in tests
-    spend = DailySpend(1.0)
-    sent = []
-
-    def use(plan: dict, key: str | None = API_KEY) -> TestClient:
-        app.dependency_overrides[routes.get_llm_client] = lambda: fake_llm(plan, sent)
-        app.dependency_overrides[get_spend] = lambda: spend
-        return TestClient(app, headers={"X-API-Key": key} if key else {})
-
-    use.sent, use.spend = sent, spend
-    yield use
-    app.dependency_overrides.clear()
-    get_settings.cache_clear()
-    get_rate_limiter.cache_clear()
-```
-</details>
-
-The test names say what is protected: no key or a wrong key is refused, a server with no key answers nobody, health
-needs no key, a fourth request is refused, the window slides, the cap stops a request before any call, a failed
-request gives back its reservation, a new day starts at zero, and the IP is the last forwarded entry.
-
-<details><summary>Put this in <code>tests/test_limits.py</code></summary>
-
-```python
-"""The guards: API key, rate limit, daily spend cap. Fakes come from `conftest.py`."""
-
-import datetime as dt
-
-import pytest
-from starlette.requests import Request
-
-from docintel.api.limits import RateLimiter, client_ip
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend, SpendCapReached
-
-PDF = b"%PDF-1.4 fake"
+KUBIENT = SAMPLES_DIR / "kubient.pdf"
+QUOTE = 'Kubient, Inc. ("Kubient")'
 PLAN = {"fields": ["parties"], "unknown": []}
 
 
-def post(client):
-    return client.post("/v1/extract", files={"pdf": ("c.pdf", PDF)}, data={"request": "parties"})
+def events(client, request: str) -> list[tuple[str, dict]]:
+    """Send a stream request, and read back (event, data) pairs."""
+    data = {"sample_id": "kubient", "request": request}
+    with client.stream("POST", "/v1/extract/stream", data=data) as response:
+        text = "".join(response.iter_text())
+    pairs = []
+    for block in text.replace("\r\n", "\n").split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+        if "event" in lines:
+            pairs.append((lines["event"], json.loads(lines["data"])))
+    return pairs
 
 
-def test_no_key_or_a_wrong_key_is_refused(api):
-    assert post(api(PLAN, key=None)).status_code == 401
-    assert post(api(PLAN, key="wrong")).status_code == 401
-    assert api.sent == []
+def test_a_quote_becomes_one_box_on_its_line():
+    (h,) = locate(KUBIENT, [QUOTE])
+    assert (h.quote_index, h.page, h.page_size) == (0, 1, (595.0, 842.0))
+    assert len(h.rects) == 1  # the raised quote marks stay on the same line
 
 
-def test_a_server_with_no_key_set_answers_nobody(api, monkeypatch):
-    monkeypatch.delenv("DOCINTEL_API_KEY")
-    get_settings.cache_clear()
-    assert post(api(PLAN)).status_code == 503
+def test_a_quote_on_two_lines_gets_two_boxes():
+    quote = "Customer agrees not to work with, directly or indirectly, any Third-Party"
+    (h,) = locate(KUBIENT, [quote])
+    assert len(h.rects) == 2
 
 
-def test_the_health_check_needs_no_key(api):
-    assert api(PLAN, key=None).get("/health").status_code == 200
+def test_a_quote_that_is_not_there_gives_nothing():
+    assert locate(KUBIENT, ["this sentence is not in the contract"]) == []
+    assert locate(SAMPLES_DIR / "kubient-scan.pdf", [QUOTE]) == []  # a scan has no text layer
 
 
-def test_too_many_requests_from_one_ip(api, monkeypatch):
-    monkeypatch.setenv("DOCINTEL_RATE_LIMIT", "2")
-    get_settings.cache_clear()
-    client = api(PLAN)
-    assert [post(client).status_code for _ in range(3)] == [200, 200, 429]
+def test_events_come_in_order_and_end_with_the_result(api):
+    names = [name for name, _ in events(api(PLAN), "parties")]
+    assert names == [
+        "stage",
+        "stage",
+        "stage",
+        "plan",
+        "stage",
+        "attempt",
+        "stage",
+        "result",
+    ]
 
 
-def test_the_window_slides():
-    now = [0.0]
-    limiter = RateLimiter(max_requests=1, window_s=60, clock=lambda: now[0])
-    assert limiter.allow("1.2.3.4")
-    assert not limiter.allow("1.2.3.4")
-    assert limiter.allow("5.6.7.8")  # each IP has its own count
-    now[0] = 61.0
-    assert limiter.allow("1.2.3.4")
-
-
-def test_the_cap_stops_a_request_before_any_paid_call(api):
-    api.spend.cap_usd = 0.0001
-    assert post(api(PLAN)).status_code == 503
-    assert api.sent == []
-
-
-def test_a_failed_request_gives_back_its_reservation(api):
-    response = post(api({"fields": [], "unknown": ["payment terms"]}))
-    assert response.status_code == 422
-    assert api.spend.reserved == pytest.approx(0.0)
-    assert api.spend.spent == pytest.approx(0.001)  # the plan call was paid
-
-
-def test_a_new_day_starts_at_zero():
-    day = [dt.date(2026, 11, 15)]
-    spend = DailySpend(1.0, today=lambda: day[0])
-    spend.reserve(0.9)
-    spend.settle(0.9, 0.9)
-    with pytest.raises(SpendCapReached):
-        spend.reserve(0.2)
-    day[0] = dt.date(2026, 11, 16)
-    spend.reserve(0.2)
-
-
-def test_the_ip_is_the_last_forwarded_entry():
-    scope = {"type": "http", "headers": [(b"x-forwarded-for", b"6.6.6.6, 1.2.3.4")], "client": None}
-    assert client_ip(Request(scope)) == "1.2.3.4"  # the first entry can be written by anyone
+def test_a_failure_ends_with_an_error_event(api):
+    pairs = events(api({"fields": [], "unknown": ["payment terms"]}), "payment terms")
+    assert pairs[-1] == ("error", {"status": 422, "detail": pairs[-1][1]["detail"]})
+    assert api.sent == ["Plan"]
+    assert Path(KUBIENT).exists()  # the sample is read, never moved or deleted
 ```
 </details>
+
+The box tests use a real sample PDF from `src/docintel/api/samples/`. It is part of the repo, so the test still needs
+no network.
 
 Checkpoint:
 
 ```sh
-uv run pytest tests/test_limits.py tests/test_api.py -q
+uv run pytest tests/test_stream.py -q
 make test
 make lint
 ```
 
 ```text
-................                                                         [100%]
-16 passed in 0.17s
+.....                                                                    [100%]
+5 passed in 0.10s
 ```
 
 Your project structure should now look like this:
 
 ```text
 src/docintel/
-├── api/
-│   ├── auth.py              # require_api_key
-│   ├── limits.py            # RateLimiter, client_ip, rate_limit, get_spend
-│   └── routes.py            # guards on /v1/extract
-├── core/
-│   ├── config.py            # + api key, daily cap, rate limit
-│   └── spend.py             # DailySpend, price
-└── domain/pipeline.py       # worst_cost, reserve and settle
+├── api/routes.py            # + /v1/extract/stream
+└── domain/
+    ├── extract/retry.py     # + on_attempt
+    ├── locate.py            # Highlight, find_span, line_rects, locate
+    └── pipeline.py          # on_event, highlights in FieldResult
 tests/
-├── conftest.py              # key, spend, no network for the price
-└── test_limits.py
+├── conftest.py              # + locate is faked
+└── test_stream.py
 ```
 
-<details><summary>Complete <code>src/docintel/api/limits.py</code></summary>
+<details><summary>Complete <code>src/docintel/domain/locate.py</code></summary>
 
 ```python
-"""Per-IP rate limit, and the one spend cap of this process. Both live in memory."""
+"""Where is a quote on the page? Line boxes from the text layer, so the UI can highlight it."""
 
-import threading
-import time
-from collections import defaultdict, deque
-from functools import lru_cache
+import re
+from pathlib import Path
 
-from fastapi import HTTPException, Request
+import pypdfium2 as pdfium
+from pydantic import BaseModel
 
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend
+WORD = re.compile(r"[a-z0-9]+")  # the same word rule as `citations.words`
 
-WINDOW_S = 60
+Rect = tuple[float, float, float, float]  # x0, y0, x1, y1 in PDF points; (0, 0) is bottom left
 
 
-class RateLimiter:
-    """At most `max_requests` per key in the last `window_s` seconds (a sliding window)."""
-
-    def __init__(self, max_requests: int, window_s: float = WINDOW_S, clock=time.monotonic):
-        self.max_requests = max_requests
-        self.window_s = window_s
-        self.clock = clock
-        self.hits: dict[str, deque[float]] = defaultdict(deque)
-        self.lock = threading.Lock()
-
-    def allow(self, key: str) -> bool:
-        now = self.clock()
-        with self.lock:
-            hits = self.hits[key]
-            while hits and hits[0] <= now - self.window_s:
-                hits.popleft()
-            if len(hits) >= self.max_requests:
-                return False
-            hits.append(now)
-            return True
+class Highlight(BaseModel):
+    quote_index: int
+    page: int  # from 1
+    page_size: tuple[float, float]
+    rects: list[Rect]
 
 
-@lru_cache
-def get_rate_limiter() -> RateLimiter:
-    return RateLimiter(get_settings().docintel_rate_limit)
+def find_span(quote: list[str], words: list[str]) -> tuple[int, int] | None:
+    """The first and last word index of `quote` inside `words`, side by side. None if absent."""
+    n = len(quote)
+    for start in range(len(words) - n + 1):
+        if words[start : start + n] == quote:
+            return start, start + n - 1
+    return None
 
 
-@lru_cache
-def get_spend() -> DailySpend:
-    return DailySpend(get_settings().docintel_daily_cap_usd)
+def same_line(line: list[float], box: Rect) -> bool:
+    """A box is on the current line if it is to the right and overlaps it from top to bottom."""
+    x0, y0, _, y1 = box
+    return x0 >= line[2] - 1 and y0 < line[3] and y1 > line[1]
 
 
-def client_ip(request: Request) -> str:
-    """The caller's IP. Behind Cloud Run, the last X-Forwarded-For entry is the one Google added."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
-    return request.client.host if request.client else "unknown"
+def line_rects(boxes: list[Rect]) -> list[Rect]:
+    """Join char boxes into one box per line, in reading order."""
+    lines: list[list[float]] = []
+    for box in boxes:
+        if lines and same_line(lines[-1], box):
+            line = lines[-1]
+            line[1], line[2], line[3] = min(line[1], box[1]), box[2], max(line[3], box[3])
+        else:
+            lines.append(list(box))
+    return [tuple(round(v, 1) for v in line) for line in lines]
 
 
-def rate_limit(request: Request) -> None:
-    if not get_rate_limiter().allow(client_ip(request)):
-        raise HTTPException(429, "too many requests", headers={"Retry-After": str(WINDOW_S)})
+def locate(pdf_path: Path, quotes: list[str]) -> list[Highlight]:
+    """One Highlight per quote found in the text layer. A quote that is not found is skipped."""
+    wanted = [(i, WORD.findall(q.lower())) for i, q in enumerate(quotes)]
+    found = []
+    pdf = pdfium.PdfDocument(pdf_path)
+    for page_no, page in enumerate(pdf, start=1):
+        text_page = page.get_textpage()
+        text = text_page.get_text_range()
+        spans = [(m.start(), m.end()) for m in WORD.finditer(text.lower())]
+        words = [text[a:b].lower() for a, b in spans]
+        for i, quote in wanted:
+            span = find_span(quote, words) if quote else None
+            if span is None:
+                continue
+            first, last = spans[span[0]][0], spans[span[1]][1]
+            boxes = [text_page.get_charbox(k) for k in range(first, last) if not text[k].isspace()]
+            found.append(
+                Highlight(
+                    quote_index=i, page=page_no, page_size=page.get_size(), rects=line_rects(boxes)
+                )
+            )
+        wanted = [(i, q) for i, q in wanted if i not in {h.quote_index for h in found}]
+    pdf.close()
+    return sorted(found, key=lambda h: h.quote_index)
 ```
 </details>
 
@@ -858,17 +734,17 @@ def rate_limit(request: Request) -> None:
 
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from docintel.core.config import get_settings
-from docintel.core.spend import DailySpend, price
 from docintel.domain.extract.retry import extract_with_retry, final_answer
+from docintel.domain.locate import Highlight, locate
 from docintel.domain.parse.base import ParsedDoc
 from docintel.domain.parse.docling_parser import parse_docling_ocr
 from docintel.domain.parse.pypdf_parser import parse_pypdf
-from docintel.domain.planner.planner import PLAN_MAX_TOKENS, pick, plan_request
+from docintel.domain.planner.planner import pick, plan_request
 from docintel.domain.validate.issues import Issue
 from docintel.domain.validate.rules import check_answer
 
@@ -876,10 +752,6 @@ TEXT_CHARS_PER_PAGE = 200  # below this, the PDF is a scan; the thinnest dev con
 MAX_PAGES = 100  # the longest dev contract has 82
 MAX_SCAN_PAGES = 10  # Docling OCR reads about 7 to 10 s per page on an 8 GB Mac
 EXTRACT_MAX_TOKENS = 20_000  # the largest real extraction answer used 17,999
-
-
-CHARS_PER_TOKEN = 3  # a low guess, so the worst case is high
-PROMPT_TOKENS = 1_500  # the v1 system prompt and the retry message, with room to spare
 
 
 class TooLong(ValueError):
@@ -896,10 +768,18 @@ class FieldResult(BaseModel):
     quotes: list[str]
     needs_review: bool
     issues: list[Issue]
+    highlights: list[Highlight] = []  # empty for a scan, or a quote not found in the text layer
+
+
+class Document(BaseModel):
+    filename: str
+    sha256: str  # the same file always has the same hash, so reviews can find it again
+    sample_id: str | None = None
 
 
 class ExtractResult(BaseModel):
     request_id: str
+    document: Document
     fields: dict[str, FieldResult]
     unknown: list[str]
     needs_review: bool
@@ -921,46 +801,51 @@ def parse_pdf(pdf_path: Path) -> ParsedDoc:
     return parse_docling_ocr(pdf_path)
 
 
-def worst_cost(text: str, in_price: float, out_price: float, retries: int = 2) -> float:
-    """The most one request can cost: the plan, then every extraction attempt at its limit."""
-    base = len(text) / CHARS_PER_TOKEN + PROMPT_TOKENS
-    tokens_in = sum(base + k * EXTRACT_MAX_TOKENS for k in range(retries + 1))  # a retry resends
-    tokens_out = (retries + 1) * EXTRACT_MAX_TOKENS
-    plan = PROMPT_TOKENS * in_price + PLAN_MAX_TOKENS * out_price
-    return plan + tokens_in * in_price + tokens_out * out_price
+Emit = Callable[[str, dict], None]  # (event name, data); the API turns these into SSE events
+
+
+def no_events(event: str, data: dict) -> None:
+    pass
 
 
 def run_pipeline(
-    pdf_path: Path, request: str, client=None, spend: DailySpend | None = None
+    pdf_path: Path, request: str, document: Document, client=None, on_event: Emit = no_events
 ) -> ExtractResult:
-    """Parse, reserve the worst cost, plan, extract with retries, check, keep the asked fields."""
+    """Parse, plan, extract with retries, check, keep the asked fields. Reports each step."""
     start = time.perf_counter()
+    on_event("stage", {"name": "parse", "status": "start"})
     doc = parse_pdf(pdf_path)
-    spend = spend or DailySpend(float("inf"))
-    worst = worst_cost(doc.text, *price(get_settings().docintel_model))
-    spend.reserve(worst)  # raises SpendCapReached before any paid call
-    costs = []
-    try:
-        plan, plan_call = plan_request(request, client=client)
-        costs.append(plan_call.cost_usd if plan_call else 0.0)
-        if not plan.fields:
-            raise NothingToExtract(f"no known field in the request; unknown: {plan.unknown}")
-        attempts = extract_with_retry(doc.text, client=client, max_tokens=EXTRACT_MAX_TOKENS)
-        costs += [a.result.cost_usd for a in attempts]
-    finally:
-        spend.settle(worst, sum(c or 0.0 for c in costs))
+    on_event("stage", {"name": "parse", "status": "done", "parser": doc.parser_name})
+    on_event("stage", {"name": "plan", "status": "start"})
+    plan, plan_call = plan_request(request, client=client)
+    on_event("plan", {"fields": plan.fields, "unknown": plan.unknown})
+    if not plan.fields:
+        raise NothingToExtract(f"no known field in the request; unknown: {plan.unknown}")
+    on_event("stage", {"name": "extract", "status": "start"})
+    attempts = extract_with_retry(
+        doc.text,
+        client=client,
+        max_tokens=EXTRACT_MAX_TOKENS,
+        on_attempt=lambda a: on_event("attempt", {"n": a.attempt_no, "errors": len(a.errors)}),
+    )
     answer = final_answer(attempts)
     if answer is None:
         raise ValueError("the model gave no answer that fits the schema")
+    on_event("stage", {"name": "check", "status": "start"})
     issues = check_answer(answer, doc.text)  # rule errors and review warnings
     picked = pick(answer, plan.fields)
     fields = {}
     for name in plan.fields:
         own = [i for i in issues if i.field == name]
         answer_part = getattr(picked, name).model_dump()
-        fields[name] = FieldResult(**answer_part, needs_review=bool(own), issues=own)
+        boxes = locate(pdf_path, answer_part["quotes"]) if doc.parser_name == "pypdf" else []
+        fields[name] = FieldResult(
+            **answer_part, needs_review=bool(own), issues=own, highlights=boxes
+        )
+    costs = [a.result.cost_usd for a in attempts] + [plan_call.cost_usd if plan_call else 0.0]
     return ExtractResult(
         request_id=str(uuid.uuid4()),
+        document=document,
         fields=fields,
         unknown=plan.unknown,
         needs_review=any(f.needs_review for f in fields.values()),
@@ -972,82 +857,232 @@ def run_pipeline(
 ```
 </details>
 
-## Break it on purpose
+<details><summary>Complete <code>src/docintel/api/routes.py</code></summary>
 
-Both breaks are free. Put the code back after each one.
+```python
+"""The routes. Each one checks its input, then calls a typed function from `domain/`."""
 
-**Break 1: settle only on success.** In `run_pipeline`, replace `finally:` with `except Exception:` and `raise`, and
-move the `settle` line below the `try` block. Guess: which test fails?
+import asyncio
+import hashlib
+import json
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Annotated
 
-<details><summary>What you see</summary>
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
+from sse_starlette import EventSourceResponse
 
-```text
-FAILED tests/test_limits.py::test_a_failed_request_gives_back_its_reservation
+from docintel.api.samples import Sample, load_samples, sample_pdf
+from docintel.api.schemas import Health
+from docintel.domain.pipeline import (
+    Document,
+    ExtractResult,
+    NothingToExtract,
+    TooLong,
+    run_pipeline,
+)
+from docintel.domain.planner.planner import PlanError
+
+VERSION = "0.1.0"
+MAX_BYTES = 10 * 1024 * 1024  # the largest dev PDF is 0.48 MB; scans are bigger
+MAX_REQUEST_CHARS = 500
+TIMEOUT_S = 240  # 3 slow extraction calls, plus OCR on a 10-page scan
+KNOWN_ERRORS = {  # error type -> HTTP status; anything else is a bug (500)
+    TimeoutError: 504,
+    TooLong: 413,
+    NothingToExtract: 422,
+    PlanError: 502,
+}
+
+router = APIRouter()
+
+
+def get_llm_client():
+    """None means the real OpenRouter client. Tests replace this with a fake."""
+    return None
+
+
+def as_http(error: Exception) -> HTTPException:
+    status = KNOWN_ERRORS[type(error)]
+    detail = f"no answer within {TIMEOUT_S} s" if status == 504 else str(error)
+    return HTTPException(status, detail)
+
+
+@router.get("/health")
+def health() -> Health:
+    return Health(status="ok", version=VERSION)
+
+
+@router.get("/v1/samples")
+def samples() -> list[Sample]:
+    return list(load_samples().values())
+
+
+@router.get("/v1/samples/{sample_id}/pdf")
+def sample_file(sample_id: str) -> FileResponse:
+    path = sample_pdf(sample_id)
+    if path is None:
+        raise HTTPException(404, f"no sample {sample_id!r}")
+    return FileResponse(path, media_type="application/pdf")
+
+
+async def read_input(pdf: UploadFile | None, sample_id: str | None) -> tuple[bytes, Document]:
+    """The PDF bytes and their `Document`, from an upload or from a sample. Exactly one."""
+    if (pdf is None) == (sample_id is None):
+        raise HTTPException(422, "send a pdf or a sample_id, not both and not neither")
+    if sample_id is not None:
+        path = sample_pdf(sample_id)
+        if path is None:
+            raise HTTPException(404, f"no sample {sample_id!r}")
+        data, filename = path.read_bytes(), path.name
+    else:
+        if pdf.size is not None and pdf.size > MAX_BYTES:
+            raise HTTPException(413, f"the PDF is over {MAX_BYTES // (1024 * 1024)} MB")
+        data, filename = await pdf.read(), pdf.filename or "upload.pdf"
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(415, "the file is not a PDF")
+    sha = hashlib.sha256(data).hexdigest()
+    return data, Document(filename=filename, sha256=sha, sample_id=sample_id)
+
+
+@router.post("/v1/extract")
+async def extract(
+    client: Annotated[object, Depends(get_llm_client)],
+    pdf: UploadFile | None = None,
+    sample_id: Annotated[str | None, Form()] = None,
+    request: Annotated[str, Form()] = "",
+) -> ExtractResult:
+    if len(request) > MAX_REQUEST_CHARS:
+        raise HTTPException(422, f"the request is over {MAX_REQUEST_CHARS} characters")
+    data, document = await read_input(pdf, sample_id)
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "upload.pdf"
+        path.write_bytes(data)
+        try:
+            return await asyncio.wait_for(
+                run_in_threadpool(run_pipeline, path, request, document, client),
+                timeout=TIMEOUT_S,
+            )
+        except tuple(KNOWN_ERRORS) as e:
+            raise as_http(e) from None
+
+
+@router.post("/v1/extract/stream")
+async def extract_stream(
+    client: Annotated[object, Depends(get_llm_client)],
+    pdf: UploadFile | None = None,
+    sample_id: Annotated[str | None, Form()] = None,
+    request: Annotated[str, Form()] = "",
+) -> EventSourceResponse:
+    """The same work as /v1/extract, sent as events while it runs: stage, plan, attempt, result."""
+    if len(request) > MAX_REQUEST_CHARS:
+        raise HTTPException(422, f"the request is over {MAX_REQUEST_CHARS} characters")
+    data, document = await read_input(pdf, sample_id)
+    folder = Path(tempfile.mkdtemp())
+    path = folder / "upload.pdf"
+    path.write_bytes(data)
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def emit(event: str, data: dict) -> None:  # runs in the pipeline's thread
+        loop.call_soon_threadsafe(queue.put_nowait, (event, data))
+
+    async def work() -> None:
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(run_pipeline, path, request, document, client, emit),
+                timeout=TIMEOUT_S,
+            )
+            await queue.put(("result", result.model_dump(mode="json")))
+        except tuple(KNOWN_ERRORS) as e:
+            error = as_http(e)
+            await queue.put(("error", {"status": error.status_code, "detail": error.detail}))
+        except Exception:  # a bug: say so, without the details
+            await queue.put(("error", {"status": 500, "detail": "internal error"}))
+        finally:
+            await queue.put(None)  # the end
+
+    async def events():
+        task = asyncio.create_task(work())
+        try:
+            while (item := await queue.get()) is not None:
+                name, payload = item
+                yield {"event": name, "data": json.dumps(payload)}
+        finally:
+            await task
+            shutil.rmtree(folder, ignore_errors=True)
+
+    return EventSourceResponse(events())
 ```
-
-The request with only unknown fields failed after the plan call. Its reservation was never given back. After 35 such
-requests, the cap would refuse everyone for the rest of the day.
 </details>
 
-**Break 2: compare with `==`.** In `require_api_key`, replace the `compare_digest` condition with
-`if key != expected.get_secret_value():`. Guess: which test fails?
+## Break it on purpose
+
+The break is free. Put the code back after it.
+
+**Break 1: group lines by their bottom.** In `same_line`, replace the `return` line with
+`return abs(line[1] - y0) < 3`. Guess: which tests fail, and with what numbers?
 
 <details><summary>What you see</summary>
 
 ```text
-9 passed
+>       assert len(h.rects) == 1  # the raised quote marks stay on the same line
+E       assert 3 == 1
+>       assert len(h.rects) == 2
+E       assert 3 == 2
 ```
 
-None. A timing attack cannot be seen in a unit test, because the difference is a few nanoseconds. This rule is kept by
-code review, not by a test. Put `compare_digest` back.
+Both box tests fail. The raised quote marks each start a new "line" (Round 1). In the UI, one highlight would look
+like three broken pieces.
 </details>
 
 ## Experiment
 
-This part runs no experiment. The guards change who may call and how much they may spend, not the answers. Your
-Step 1 numbers are in `EXPERIMENTS.md`, next to the 4a2 limits.
+This part runs no experiment. The Step 2 count (156 of 158) is a check, not a new eval number: it reuses the 158 quotes
+of the `e3` set.
 
 ## Gotchas
 
-- **Each Cloud Run instance has its own counts.** Two instances mean two caps and two rate limits. 4b fixes the spend
-  count with Postgres. The OpenRouter credit limit in 4c is the hard backup.
-- **A restart forgets today's spend.** The memory is gone. 4b fixes this too.
-- **The rate limit counts refused requests.** Checkpoint 1 shows it. That is on purpose.
-- **A timed-out request still settles.** Its thread finishes, and `finally` adds the real cost.
-- **A request that fails inside `extract_with_retry` loses the cost of its finished attempts.** The attempts list
-  never comes back. The reservation is still returned. The OpenRouter credit limit covers this gap.
+- **A quote across a page break is not found.** `locate` looks at one page at a time. It is rare in CUAD; the UI still
+  shows the quote text.
+- **A quote with a copy error is not found.** The same as `quote_missing` in 2a. No box is better than a wrong box.
+- **A closed stream does not stop the work.** If the browser leaves, the thread still finishes, and its calls are
+  still paid.
+- **`curl` without `-N` waits for the end.** It holds back the output. The events are still sent as they happen.
 
 ## Explain back, then commit
 
 Explain to Claude in a few sentences:
 
-- `auth.py`: why 503 when no key is set, and why `compare_digest`.
-- `limits.py`: how the sliding window works, step by step. Which IP is trusted, and why.
-- `spend.py`: reserve and settle, with the numbers from Round 1 and Round 2.
-- `pipeline.py`: why the reservation comes after parsing and before planning. What `finally` protects.
-- Why `spend.py` is in `core/`, not in `api/`.
-- What breaks on two instances, and which part fixes it.
+- `locate.py`: the steps from a quote to line boxes, and why lines are joined that way (Round 1).
+- Why the boxes use points and a bottom-left origin, and how the UI flips them (Round 3).
+- `pipeline.py`: which events are sent, and when. Why `on_event` is a plain callback.
+- `routes.py`: the job of `emit`, `work` and `events`, and why `call_soon_threadsafe`.
+- How an error reaches the browser in a stream.
 
 Then:
 
 ```sh
 git status
-git add src/docintel/api src/docintel/core/config.py src/docintel/core/spend.py src/docintel/domain/pipeline.py tests/conftest.py tests/test_limits.py EXPERIMENTS.md
-git commit -m "phase 4a3: API key, rate limit, spend cap"
+git add pyproject.toml uv.lock src/docintel/domain/locate.py src/docintel/domain/pipeline.py src/docintel/domain/extract/retry.py src/docintel/api/routes.py tests/conftest.py tests/test_stream.py
+git commit -m "phase 4a3: highlights and the event stream"
 ```
 
 ## Conclusion
 
-The API now refuses strangers, slows down loops, and stops spending before the daily cap. Go back through the
+The API can now say where each quote is, and what it is doing while it works. Phase 4a is done. Go back through the
 objectives and check each one without notes. Then answer:
 
-1. Ten requests for a 100-page contract arrive at the same second, with a $1 cap. What happens to each one?
-2. Why is "reserve the worst case" safer than "check what was spent", even with only one instance?
+1. A quote is found by the citation check, but `locate` returns nothing for it. Give two reasons.
+2. Why does the stream send an `error` event, and not an HTTP error status?
 
 Looking for more challenges? Try these (optional):
 
-1. Add `X-RateLimit-Remaining` to every answer, like many public APIs do.
-2. Add a second, smaller cap per API key, so one client cannot use the whole day.
+1. Keep Docling's OCR word boxes in `ParsedDoc`, and highlight scans too.
+2. Send a `field` event for each field after `check`, so the UI could reveal rows from the server.
 
-Checklist (`../PLAN.md`): **Auth, rate limits, spend caps, secrets**. **Retries, timeouts, degradation, idempotency**
-(the reservation is given back on every path). Phase 4a is done. Next: 4b.
+Checklist (`../PLAN.md`): **Structured outputs** (the `Highlight` model). **Retries, timeouts, degradation** (an
+error event, no boxes for scans). Next: 4b.

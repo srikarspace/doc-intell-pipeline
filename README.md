@@ -63,7 +63,7 @@ There are two notes for each part. `learn/phase-N.md` covers what the part build
 
 Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers.
 
-Planned additions: FastAPI, Phoenix, Docker, Cloud Run and Next.js.
+Planned additions: FastAPI serving a React (Vite) + daisyUI app, and Phoenix traces. It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
 
 ## Quickstart
 

@@ -216,7 +216,6 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - For a real CER comparison we need to clean the text extracted by the library/model.
 - Even with low CER the quotes can not match because of small errors at the places that matter.
 - For scanned PDFs pypdf always fails as there is no text in the pdfs. In that case the only option we have is Docling or Vision models.
-- 
 
 
 

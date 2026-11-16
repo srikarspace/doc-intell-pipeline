@@ -3,8 +3,8 @@
 In this part, you build the planner. It reads a request typed by a person, and picks which of the 12 fields to
 return. Then you measure it on requests you write yourself. Each piece has a checkpoint.
 
-This is part 1 of 3 for Phase 4a. 4a2 builds the API around the pipeline. 4a3 adds the key, the rate limit and the
-spend cap. This part costs about $0.002 in total.
+This is part 1 of 3 for Phase 4a. 4a2 builds the API around the pipeline. 4a3 adds highlights and a live stream
+for the UI. This part costs about $0.002 in total.
 
 ## Words used in this part
 
@@ -54,8 +54,8 @@ After this part:
 Plan(fields=['parties', 'non_compete', 'renewal_term'], unknown=[])
 ```
 
-- **4a2** puts the planner first in the pipeline, behind `POST /v1/extract`.
-- **4d** shows the `unknown` list in the UI, so a user knows what was not answered.
+- **4a2** puts the planner in the pipeline, right after parsing, behind `POST /v1/extract`.
+- **4c** shows the `unknown` list in the UI, so a user knows what was not answered.
 
 ## Remember this
 
