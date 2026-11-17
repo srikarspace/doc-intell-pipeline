@@ -690,8 +690,8 @@ In a second terminal:
 
 ```sh
 curl -s localhost:8000/health; echo
-curl -s localhost:8000/v1/fields | python -c "import json,sys; d=json.load(sys.stdin); print(len(d), 'fields'); [print(f['group'], '|', f['name'], '|', f['label']) for f in d[:4]]"
-curl -s localhost:8000/v1/samples | python -c "import json,sys; d=json.load(sys.stdin); print(len(d), 'samples'); [print(s['id'], '|', s['title'], '|', s['pages'], 'pages') for s in d[:3]]"
+curl -s localhost:8000/v1/fields | uv run python -c "import json,sys; d=json.load(sys.stdin); print(len(d), 'fields'); [print(f['group'], '|', f['name'], '|', f['label']) for f in d[:4]]"
+curl -s localhost:8000/v1/samples | uv run python -c "import json,sys; d=json.load(sys.stdin); print(len(d), 'samples'); [print(s['id'], '|', s['title'], '|', s['pages'], 'pages') for s in d[:3]]"
 curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download} bytes\n" localhost:8000/v1/samples/kubient/pdf
 curl -s -w " %{http_code}\n" localhost:8000/v1/samples/nope/pdf
 ```
@@ -816,7 +816,7 @@ the 12. No PDF was read, and no model was called.
 Checkpoint 2 (paid, about $0.001): a sample.
 
 ```sh
-curl -s -F sample_id=kubient -F fields=parties localhost:8000/v1/extract | python -m json.tool
+curl -s -F sample_id=kubient -F fields=parties localhost:8000/v1/extract | uv run python -m json.tool
 ```
 
 In short: `parties` found with two names and no issue, `document` with the sample id and the file's sha256, parser

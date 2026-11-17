@@ -1,0 +1,82 @@
+[
+  {
+    "id": "kubient",
+    "title": "Kubient: master services agreement",
+    "contract_type": "Service",
+    "pages": 2,
+    "scan": false,
+    "doc_id": "KUBIENT,INC_07_02_2020-EX-10.14-MASTER SERVICES AGREEMENT_Part2"
+  },
+  {
+    "id": "ecoscience",
+    "title": "EcoScience: sponsorship agreement",
+    "contract_type": "Sponsorship",
+    "pages": 3,
+    "scan": false,
+    "doc_id": "EcoScienceSolutionsInc_20180406_8-K_EX-10.1_11135398_EX-10.1_Sponsorship Agreement"
+  },
+  {
+    "id": "vivint",
+    "title": "Vivint Solar: non-competition agreement",
+    "contract_type": "Non_Compete_Non_Solicit",
+    "pages": 4,
+    "scan": false,
+    "doc_id": "VIVINT SOLAR, INC. - NON-COMPETITION AGREEMENT"
+  },
+  {
+    "id": "ivillage",
+    "title": "iVillage: sponsorship agreement",
+    "contract_type": "Sponsorship",
+    "pages": 5,
+    "scan": false,
+    "doc_id": "IVILLAGEINC_03_17_1999-EX-10.16-SPONSORSHIP AGREEMENT"
+  },
+  {
+    "id": "integrity-funds",
+    "title": "Integrity Funds: underwriting contract",
+    "contract_type": "Service",
+    "pages": 8,
+    "scan": false,
+    "doc_id": "IntegrityFunds_20200121_485BPOS_EX-99.E UNDR CONTR_11948727_EX-99.E UNDR CONTR_Service Agreement"
+  },
+  {
+    "id": "variable-account",
+    "title": "Variable Separate Account: capital maintenance",
+    "contract_type": "Maintenance",
+    "pages": 8,
+    "scan": false,
+    "doc_id": "VARIABLESEPARATEACCOUNT_04_30_2014-EX-13.C-UNCONDITIONAL CAPITAL MAINTENANCE AGREEMENT"
+  },
+  {
+    "id": "euromedia",
+    "title": "Euromedia: license agreement",
+    "contract_type": "License_Agreements",
+    "pages": 12,
+    "scan": false,
+    "doc_id": "EuromediaHoldingsCorp_20070215_10SB12G_EX-10.B(01)_525118_EX-10.B(01)_Content License Agreement"
+  },
+  {
+    "id": "borrowmoney",
+    "title": "BorrowMoney.com: joint venture agreement",
+    "contract_type": "Joint Venture",
+    "pages": 13,
+    "scan": false,
+    "doc_id": "BORROWMONEYCOM,INC_06_11_2020-EX-10.1-JOINT VENTURE AGREEMENT"
+  },
+  {
+    "id": "el-pollo-loco",
+    "title": "El Pollo Loco: development agreement",
+    "contract_type": "Development",
+    "pages": 14,
+    "scan": false,
+    "doc_id": "ElPolloLocoHoldingsInc_20200306_10-K_EX-10.16_12041700_EX-10.16_Development Agreement"
+  },
+  {
+    "id": "kubient-scan",
+    "title": "Kubient: master services agreement (scan)",
+    "contract_type": "Service",
+    "pages": 2,
+    "scan": true,
+    "doc_id": "KUBIENT,INC_07_02_2020-EX-10.14-MASTER SERVICES AGREEMENT_Part2"
+  }
+]

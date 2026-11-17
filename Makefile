@@ -17,5 +17,8 @@ fmt:  ## auto-fix lint + format
 	uv run ruff check --fix .
 	uv run ruff format .
 
+serve:  ## run the API on http://localhost:8000
+	uv run uvicorn docintel.api.app:app --reload
+
 nb:  ## launch Jupyter Lab in notebooks/
 	uv run jupyter lab notebooks/

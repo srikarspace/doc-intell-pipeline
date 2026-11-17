@@ -1,5 +1,7 @@
 """The 12 fields as Pydantic models. The JSON schema we send to the model is built from these."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -66,3 +68,6 @@ CUAD_CATEGORY = {  # attribute name -> CUAD category, so 1b can join on labels.c
     "ip_ownership_assignment": "Ip Ownership Assignment",
     "non_transferable_license": "Non-Transferable License",
 }
+
+FIELDS = tuple(ContractFields.model_fields)  # the 12 names, in schema order
+FieldName = Literal[FIELDS]  # one of the 12 names, and nothing else

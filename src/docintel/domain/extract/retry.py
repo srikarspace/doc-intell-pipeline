@@ -39,13 +39,21 @@ def feedback(errors: list[Issue]) -> str:
 
 
 def extract_with_retry(
-    text: str, model: str | None = None, *, prompt_version: str = "v1", max_retries: int = 2
+    text: str,
+    model: str | None = None,
+    *,
+    prompt_version: str = "v1",
+    max_retries: int = 2,
+    client=None,
+    max_tokens: int | None = None,
 ) -> list[Attempt]:
     """Every attempt for one contract, in order. Stops when there are no errors, or no progress."""
     messages = build_messages(text, prompt_version)
     attempts = []
     for attempt_no in range(max_retries + 1):
-        result = call_llm(messages, ContractFields, model=model)
+        result = call_llm(
+            messages, ContractFields, model=model, client=client, max_tokens=max_tokens
+        )
         attempt = Attempt(attempt_no, result, check_result(result, text))
         attempts.append(attempt)
         if not attempt.errors:

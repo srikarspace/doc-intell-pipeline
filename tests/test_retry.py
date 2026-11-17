@@ -23,7 +23,7 @@ def fake_llm(monkeypatch, *replies: str) -> list:
     """Make `call_llm` return `replies` in order. Returns the messages of each call."""
     sent = []
 
-    def call(messages, schema, *, model=None):
+    def call(messages, schema, *, model=None, client=None, max_tokens=None):
         sent.append(messages)
         raw = replies[len(sent) - 1]
         parsed, error = _parse(schema, raw)
