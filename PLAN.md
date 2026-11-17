@@ -231,17 +231,19 @@ Standard layout shared by every project (see ../PLAN.md). Only `domain/` is proj
 
 ```
 src/docintel/
-  core/      config.py (pydantic-settings) · llm.py (OpenRouter client, cost, retries) · log.py · trace.py
+  core/      config.py (pydantic-settings) · llm.py (OpenRouter client, cost, retries) · logs.py (structlog JSON) · tracing.py (Phoenix)
   domain/    schema/ (field models) · extract/ · validate/ · parse/ (+ scan degrader) · locate.py · pipeline.py
   evals/     store.py (DuckDB) · datasets.py (CUAD download/load, splits) · scorers.py (P/R) · runner.py (run_id)
-  api/       app.py · routes.py · fields.py · schemas.py · samples.py · samples/ (10 sample PDFs)
+  db/        app_data.py (app tables `requests` + `reviews` in the same DuckDB file, stats query)
+  api/       app.py (request_id middleware) · routes.py · fields.py · schemas.py · samples.py · samples/ (10 sample PDFs)
 web/         React + Vite + daisyUI app (built to web/dist, served by FastAPI)
 learn/       phase docs · notebooks/ · tests/
 Makefile · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
 ```
 
-This project is local-first, so it leaves out parts of the shared layout: `db/` (DuckDB is enough), `evals/mini/` and
-the CI eval gate, `Dockerfile` and deploy workflows. They are README "future work".
+This project is local-first, so it leaves out parts of the shared layout: `evals/mini/` and the CI eval gate,
+`Dockerfile` and deploy workflows. They are README "future work". `db/` holds only the app's DuckDB tables (no
+Postgres, no migrations tool).
 
 Agentic pattern: each capability (`extract`, `parse`, `locate`) is a typed function (Pydantic in,
 Pydantic out) with a trace span, called by the API, the eval runner, and later as an agent tool.
@@ -289,9 +291,10 @@ day. Parts were merged to fit; the router and the free-text planner are cut (REA
 | 2 | 3b | fake scans + CER | seeded scan degrader, CER against CUAD's `.txt` | done |
 | 2 | 3b2 | experiment design + wiring | docs, metric, costs, keep rule, Docling OCR, frozen set, parse stage | done |
 | 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
-| 3 | 4a | API | FastAPI app, `run_pipeline`, `Literal` field names + `GET /v1/fields`, samples + upload, parser by PDF, limits, time limit | doc ready |
-| 3 | 4a2 | highlights + stream | quote -> page boxes (`locate`), evidence lines for "maybe missed", stage events, `POST /v1/extract/stream` (SSE) | doc ready |
-| 3 | 4b | observability + reviews | Phoenix spans (local), JSON logs, `requests` + `reviews` in DuckDB, `POST /v1/reviews` + undo, p50/p95/cost query | planned |
+| 3 | 4a | API | FastAPI app, `run_pipeline`, `Literal` field names + `GET /v1/fields`, samples + upload, parser by PDF, limits, time limit | done |
+| 3 | 4a2 | highlights + stream | quote -> page boxes (`locate`), evidence lines for "maybe missed", stage events, `POST /v1/extract/stream` (SSE) | done |
+| 3 | 4b | traces + logs | request_id middleware, structlog JSON logs, OTel spans (parse, extract, attempt, check, highlight) + OpenInference, local Phoenix (`make phoenix`), how to read a trace | doc ready |
+| 3 | 4b2 | requests + reviews | `requests` + `reviews` in DuckDB, `POST /v1/reviews` + `DELETE` undo, `make stats` (p50/p95/errors/cost) | doc ready |
 | 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | planned |
 | 3 | 4c2 | UI review + demo | react-pdf pane + quote and evidence highlights, review card (Modify / Accept, undo), Passed, Copy JSON, one Playwright e2e, demo video | planned |
 | 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
@@ -548,14 +551,22 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > `POST /v1/extract/stream` with sse-starlette: `stage`, `attempt`, `result` or `error`, with the same input checks and
 > time limit. Tests: boxes on committed samples, an evidence line, event order with the fake model."
 
-> **4b Observability + reviews:** "Needs 4a2. Phoenix as a local process (`make phoenix`), spans for parse,
-> extract attempts and check, plus OpenInference auto-traces of the OpenAI calls. structlog JSON logs with
-> `request_id`. Two DuckDB tables in `data/docintel.duckdb`: `requests` (one row per extract: document, fields,
-> parser, cost, latency) and `reviews` (accept or modify, old and new value). `POST /v1/reviews`, and `DELETE` for
-> undo. A p50/p95/error/cost query over `requests`. How to read a trace. No new server: DuckDB and Phoenix run on
-> the user's machine."
+> 4b is split in two, because it did not fit one doc in simple English:
 
-> **4c UI shell:** "Needs 4b. `web/`: React + Vite + TypeScript + Tailwind + daisyUI + lucide-react + TanStack
+> **4b Traces + logs:** "Needs 4a2. A middleware gives each request one `request_id` (header, answer, every log line,
+> root span). structlog JSON logs (`extract.done`, `extract.failed`, `extract.crashed`), never contract text. OTel
+> spans in `domain/` for parse, extract, each attempt, check and highlight (a no-op with no provider), plus
+> OpenInference auto-traces of the OpenAI calls. Phoenix as a local process with `uvx` (`make phoenix`, assistant
+> tools and usage tracking off), registered in the FastAPI lifespan; only the extract routes are traced. How to read
+> a trace. A test with an in-memory exporter."
+
+> **4b2 Requests + reviews:** "Needs 4b. Two DuckDB tables in `data/docintel.duckdb`: `requests` (one row per
+> extract, good or failed: document, fields, status, parser, cost, latency, the answer) and `reviews` (accept or
+> modify, old value from the stored answer, new value). The columns and the review rules are user decisions.
+> `POST /v1/reviews`, and `DELETE` for undo. `make stats`: p50/p95/errors/cost per route. Tests on a temp database.
+> No new server: DuckDB and Phoenix run on the user's machine."
+
+> **4c UI shell:** "Needs 4b2. `web/`: React + Vite + TypeScript + Tailwind + daisyUI + lucide-react + TanStack
 > Query. Field chips from `GET /v1/fields` (4 groups, all on, select all / clear), drop zone (PDF only), sample tiles,
 > analyze card as in the prototype (stage pill in one accent color, `skeleton` rows that reveal one by one, pill
 > Analyzing / Issue found / Passed), cost footer, 'New contract' at the top. `fetch` +

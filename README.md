@@ -19,7 +19,7 @@ Built from **Project 1: Document intelligence pipeline** in [AI Engineer Project
 | 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | done |
 | 2 trust layer | [2a](./learn/phase-2a.md) validators + citations · [2a2](./learn/phase-2a2.md) needs-review rules · [2b](./learn/phase-2b.md) retry loop · [2b2](./learn/phase-2b2.md) trust replay tool · [2b3](./learn/phase-2b3.md) trust run | done |
 | 3 parser comparison | [3a](./learn/phase-3a.md) interface + pypdf · [3a2](./learn/phase-3a2.md) Docling · [3a3](./learn/phase-3a3.md) vision LLM · [3b](./learn/phase-3b.md) fake scans + CER · [3b2](./learn/phase-3b2.md) experiment design · [3b3](./learn/phase-3b3.md) E3 run | done |
-| 4 product | [4a](./learn/phase-4a.md) API · [4a2](./learn/phase-4a2.md) highlights + stream · 4b observability + reviews · 4c UI · 4c2 review + demo | next |
+| 4 product | [4a](./learn/phase-4a.md) API · [4a2](./learn/phase-4a2.md) highlights + stream · [4b](./learn/phase-4b.md) traces + logs · [4b2](./learn/phase-4b2.md) requests + reviews · 4c UI · 4c2 review + demo | in progress (4a, 4a2 done) |
 | 5 write-up | figures, README, mock interview | planned |
 
 ## Results so far (dev, 52 contracts, 12 fields)
@@ -61,9 +61,9 @@ There are two notes for each part. `learn/phase-N.md` covers what the part build
 
 ## Stack
 
-Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers.
+Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers · FastAPI + sse-starlette (API and live stream) · pypdfium2 (quote boxes).
 
-Planned additions: FastAPI serving a React (Vite) + daisyUI app, and Phoenix traces. It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
+Planned additions: structlog JSON logs and local Phoenix traces (4b), app tables for requests and reviews in DuckDB (4b2), and a React (Vite) + daisyUI app served by FastAPI (4c, 4c2). It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
 
 ## Quickstart
 
@@ -92,6 +92,18 @@ uv run python -m docintel.evals.trust <run_id>           # first vs final answer
 uv run python -m docintel.evals.parser_experiment text     # E3: CER, quotes, cost per parser cell
 uv run python -m docintel.evals.parser_experiment compare  # E3: F1 against cost per cell
 ```
+
+The API (`make serve`, then http://localhost:8000/docs):
+
+```bash
+curl localhost:8000/v1/fields                      # the 12 fields, with labels and groups
+curl localhost:8000/v1/samples                     # 10 sample contracts (one is a fake scan)
+curl -X POST localhost:8000/v1/extract -F sample_id=kubient -F fields=parties   # paid, about $0.001
+curl -N -X POST localhost:8000/v1/extract/stream -F pdf=@contract.pdf           # live steps, then the answer
+```
+
+Each answer has the value, the quotes, their boxes on the page, and a needs-review flag with its reasons. With no
+`fields`, all 12 are returned.
 
 DuckDB tables:
 - `contracts`, `labels` and `splits` come from `make data`.
