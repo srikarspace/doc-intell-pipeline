@@ -46,6 +46,7 @@ def extract_with_retry(
     max_retries: int = 2,
     client=None,
     max_tokens: int | None = None,
+    on_attempt=None,
 ) -> list[Attempt]:
     """Every attempt for one contract, in order. Stops when there are no errors, or no progress."""
     messages = build_messages(text, prompt_version)
@@ -56,6 +57,8 @@ def extract_with_retry(
         )
         attempt = Attempt(attempt_no, result, check_result(result, text))
         attempts.append(attempt)
+        if on_attempt:
+            on_attempt(attempt)
         if not attempt.errors:
             break
         if attempt_no > 0 and error_keys(attempt) == error_keys(attempts[-2]):

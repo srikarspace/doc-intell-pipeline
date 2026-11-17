@@ -217,7 +217,13 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - Even with low CER the quotes can not match because of small errors at the places that matter.
 - For scanned PDFs pypdf always fails as there is no text in the pdfs. In that case the only option we have is Docling or Vision models.
 
-
+# Phase 4:
+- Added an API to parse and return page labels with quotes
+- Added error scenarios like timeout, too long, no answer
+- Also added some sample pdf's so that users can use them to test
+- Also making the API SSE(server side events) so that we can display it in the UI for user understanding instead of single spinner
+- We can only highlight pdfs only when text is available for scanned pdfs that is not possible.
+- We return the boxes for each quote. The boxes are coordinates in the page(x0, y0, x1, y1) so that UI can use them to highlight.
 
 
 

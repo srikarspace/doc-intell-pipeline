@@ -59,6 +59,7 @@ def api(monkeypatch, sent) -> TestClient:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
     get_settings.cache_clear()
     monkeypatch.setattr(pipeline, "parse_pdf", lambda path: from_pages([CONTRACT], 0.0, 1, "pypdf"))
+    monkeypatch.setattr(pipeline, "locate", lambda path, quotes: [])  # the fake PDF has no pages
     app.dependency_overrides[routes.get_llm_client] = lambda: fake_llm(sent)
     yield TestClient(app)
     app.dependency_overrides.clear()

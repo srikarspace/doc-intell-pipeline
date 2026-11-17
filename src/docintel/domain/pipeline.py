@@ -2,11 +2,13 @@
 
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from docintel.domain.extract.retry import extract_with_retry, final_answer
+from docintel.domain.locate import Highlight, line_around, locate
 from docintel.domain.parse.base import ParsedDoc
 from docintel.domain.parse.docling_parser import parse_docling_ocr
 from docintel.domain.parse.pypdf_parser import parse_pypdf
@@ -34,6 +36,9 @@ class FieldResult(BaseModel):
     quotes: list[str]
     needs_review: bool
     issues: list[Issue]
+    highlights: list[Highlight] = []  # where each quote is; empty for a scan
+    evidence: list[str] = []  # "maybe missed": the line that holds the words the rule found
+    evidence_highlights: list[Highlight] = []  # where each evidence line is
 
 
 class Document(BaseModel):
@@ -65,23 +70,58 @@ def parse_pdf(pdf_path: Path) -> ParsedDoc:
     return parse_docling_ocr(pdf_path)
 
 
+Emit = Callable[[str, dict], None]  # (event name, data); the API turns these into SSE events
+
+
+def no_events(event: str, data: dict) -> None:
+    pass
+
+
+def boxes(pdf_path: Path, texts: list[str], text_layer: bool) -> list[Highlight]:
+    """Line boxes for each text, when the PDF has a text layer. A scan has none."""
+    return locate(pdf_path, texts) if text_layer and texts else []
+
+
 def run_pipeline(
-    pdf_path: Path, fields: list[FieldName], document: Document, client=None
+    pdf_path: Path,
+    fields: list[FieldName],
+    document: Document,
+    client=None,
+    on_event: Emit = no_events,
 ) -> ExtractResult:
-    """Parse, extract all 12 with retries, check, and keep the chosen fields (none: all 12)."""
+    """Parse, extract all 12 with retries, check, keep the chosen fields. Reports each step."""
     start = time.perf_counter()
+    on_event("stage", {"name": "parse", "status": "start"})
     doc = parse_pdf(pdf_path)
-    attempts = extract_with_retry(doc.text, client=client, max_tokens=EXTRACT_MAX_TOKENS)
+    done = {"name": "parse", "status": "done", "parser": doc.parser_name, "pages": len(doc.pages)}
+    on_event("stage", done)
+    on_event("stage", {"name": "extract", "status": "start"})
+    attempts = extract_with_retry(
+        doc.text,
+        client=client,
+        max_tokens=EXTRACT_MAX_TOKENS,
+        on_attempt=lambda a: on_event("attempt", {"n": a.attempt_no, "errors": len(a.errors)}),
+    )
     answer = final_answer(attempts)
     if answer is None:
         raise NoAnswer("the model gave no answer that fits the schema")
+    on_event("stage", {"name": "check", "status": "start"})
     issues = check_answer(answer, doc.text)  # rule errors and review warnings
+    text_layer = doc.parser_name == "pypdf"
     chosen = [f for f in FIELDS if f in fields] or list(FIELDS)  # schema order, no repeats
     results = {}
     for name in chosen:
         own = [i for i in issues if i.field == name]
         part = getattr(answer, name).model_dump()
-        results[name] = FieldResult(**part, needs_review=bool(own), issues=own)
+        evidence = [line_around(doc.text, i.detail) for i in own if i.rule == "maybe_missed"]
+        results[name] = FieldResult(
+            **part,
+            needs_review=bool(own),
+            issues=own,
+            highlights=boxes(pdf_path, part["quotes"], text_layer),
+            evidence=evidence,
+            evidence_highlights=boxes(pdf_path, evidence, text_layer),
+        )
     return ExtractResult(
         request_id=str(uuid.uuid4()),
         document=document,

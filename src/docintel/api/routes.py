@@ -2,6 +2,8 @@
 
 import asyncio
 import hashlib
+import json
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -9,6 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
+from sse_starlette import EventSourceResponse
 
 from docintel.api.fields import FIELD_INFO, FieldInfo
 from docintel.api.samples import Sample, load_samples, sample_pdf
@@ -100,3 +103,49 @@ async def extract(
             )
         except tuple(KNOWN_ERRORS) as e:
             raise as_http(e) from None
+
+
+@router.post("/v1/extract/stream")
+async def extract_stream(
+    client: Annotated[object, Depends(get_llm_client)],
+    pdf: UploadFile | None = None,
+    sample_id: Annotated[str | None, Form()] = None,
+    fields: Annotated[list[FieldName] | None, Form()] = None,
+) -> EventSourceResponse:
+    """The same work as /v1/extract, sent as events while it runs: stage, attempt, result."""
+    data, document = await read_input(pdf, sample_id)
+    folder = Path(tempfile.mkdtemp())
+    path = folder / "upload.pdf"
+    path.write_bytes(data)
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def emit(event: str, data: dict) -> None:  # runs in the pipeline's thread
+        loop.call_soon_threadsafe(queue.put_nowait, (event, data))
+
+    async def work() -> None:
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(run_pipeline, path, fields or [], document, client, emit),
+                timeout=TIMEOUT_S,
+            )
+            await queue.put(("result", result.model_dump(mode="json")))
+        except tuple(KNOWN_ERRORS) as e:
+            error = as_http(e)
+            await queue.put(("error", {"status": error.status_code, "detail": error.detail}))
+        except Exception:  # a bug: say so, without the details
+            await queue.put(("error", {"status": 500, "detail": "internal error"}))
+        finally:
+            await queue.put(None)  # the end
+
+    async def events():
+        task = asyncio.create_task(work())
+        try:
+            while (item := await queue.get()) is not None:
+                name, payload = item
+                yield {"event": name, "data": json.dumps(payload)}
+        finally:
+            await task
+            shutil.rmtree(folder, ignore_errors=True)
+
+    return EventSourceResponse(events())
