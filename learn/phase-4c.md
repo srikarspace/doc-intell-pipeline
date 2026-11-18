@@ -1,5 +1,9 @@
 # Phase 4c: the UI shell
 
+> In 4c2, the files moved: `api.ts` and `analysis.ts` to `web/src/lib/`, the start screen parts to
+> `web/src/features/start/`, `AnalyzeCard` and `StatusPill` to `web/src/features/work/`, and the stream from `App.tsx` to
+> `web/src/hooks/useAnalysis.ts`. This doc keeps the 4c paths.
+
 In this part, the app gets a face. You pick fields from chips, then drop a PDF or click a sample tile. A card shows the
 real stages of the pipeline on a pill, then the answers appear one row at a time. The pill ends on "2 issues found" or
 "Passed". `make app` serves the UI and the API from one address.

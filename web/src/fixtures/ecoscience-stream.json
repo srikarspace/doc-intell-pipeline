@@ -1,0 +1,268 @@
+[
+ {
+  "event": "stage",
+  "data": {
+   "name": "parse",
+   "status": "start"
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "parse",
+   "status": "done",
+   "parser": "pypdf",
+   "pages": 3
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "extract",
+   "status": "start"
+  }
+ },
+ {
+  "event": "attempt",
+  "data": {
+   "n": 0,
+   "errors": 0
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "check",
+   "status": "start"
+  }
+ },
+ {
+  "event": "result",
+  "data": {
+   "request_id": "b9ed26eb-d4a3-446f-af50-09cf9bd80d3a",
+   "document": {
+    "filename": "ecoscience.pdf",
+    "sha256": "952c50ad7875ed86f29dd90104b0dc3d1d1959b642a12ad03926029bff4724cc",
+    "sample_id": "ecoscience"
+   },
+   "fields": {
+    "parties": {
+     "found": true,
+     "value": [
+      "Fruit of Life Productions LLC",
+      "Eco Science Solutions, Inc."
+     ],
+     "quotes": [
+      "Fruit of Life Productions LLC, (\"Promoter\")",
+      "Eco Science Solutions, Inc.,(\"Sponsor\")"
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         405.0,
+         644.8,
+         509.3,
+         651.8
+        ],
+        [
+         50.4,
+         634.3,
+         87.1,
+         641.8
+        ]
+       ]
+      },
+      {
+       "quote_index": 1,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         109.6,
+         634.3,
+         236.1,
+         641.8
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "agreement_date": {
+     "found": true,
+     "value": "2018-04-01",
+     "quotes": [
+      "This agreement (the \"Agreement\") is made effective this 1 st day of April, 2018 (\"Effective Date\")"
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "governing_law": {
+     "found": true,
+     "value": "Florida",
+     "quotes": [
+      "This Agreement shall be governed by and interpreted in accordance with the laws of the State of Florida"
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 3,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         106.5,
+         778.8,
+         455.3,
+         786.4
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "non_compete": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "change_of_control": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "anti_assignment": {
+     "found": true,
+     "value": null,
+     "quotes": [
+      "This Agreement, or the rights granted under it, may not be assigned transferred or sublicense by either party without the express prior written consent of the other party."
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 3,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         96.6,
+         748.5,
+         527.6,
+         756.1
+        ],
+        [
+         50.0,
+         738.4,
+         179.8,
+         746.0
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "renewal_term": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "notice_period_to_terminate_renewal": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "cap_on_liability": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "license_grant": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "ip_ownership_assignment": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "non_transferable_license": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    }
+   },
+   "needs_review": false,
+   "parser": "pypdf",
+   "pages": 3,
+   "cost_usd": 0.0006461,
+   "latency_ms": 7168
+  }
+ }
+]

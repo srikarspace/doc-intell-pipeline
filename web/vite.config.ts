@@ -8,6 +8,8 @@ const api = process.env.API_URL ?? "http://localhost:8000";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // pdf.js is about 630 kB. It is in its own file (PdfPane), loaded only when a result is shown.
+  build: { chunkSizeWarningLimit: 700 },
   server: {
     port: 5173,
     proxy: { "/v1": api, "/health": api },

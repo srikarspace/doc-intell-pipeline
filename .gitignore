@@ -226,3 +226,7 @@ data/
 
 # UI packages and build (web/dist is also covered by dist/ above)
 web/node_modules/
+web/test-results/
+web/playwright-report/
+# the Python `lib/` rule above would hide the UI code
+!web/src/lib/

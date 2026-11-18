@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import type { FieldInfo } from "../api.ts";
+import type { FieldInfo } from "../../lib/api.ts";
 
 type Props = {
   fields: FieldInfo[];

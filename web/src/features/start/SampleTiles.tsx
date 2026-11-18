@@ -1,5 +1,5 @@
-import { prettyType } from "../analysis.ts";
-import type { Sample } from "../api.ts";
+import { prettyType } from "../../lib/analysis.ts";
+import type { Sample } from "../../lib/api.ts";
 
 type Props = { samples: Sample[]; disabled: boolean; onPick: (sample: Sample) => void };
 

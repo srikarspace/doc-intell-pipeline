@@ -8,7 +8,7 @@ import { type Analysis, next, pill, rows, start } from "./analysis.ts";
 import type { ExtractResult, FieldInfo, StreamEvent } from "./api.ts";
 
 const events: StreamEvent[] = JSON.parse(
-  readFileSync(new URL("./fixtures/kubient-stream.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../fixtures/kubient-stream.json", import.meta.url), "utf8"),
 );
 const result = (events.at(-1) as { data: ExtractResult }).data;
 const FIELDS: FieldInfo[] = Object.keys(result.fields).map((name) => ({ name, label: name, group: "g" }));
@@ -48,11 +48,11 @@ test("a retry says how many problems the model must fix", () => {
 test("the pill waits for the last row, then counts the flagged fields", () => {
   const done = replay(events).at(-1)!;
   assert.equal(pill(done, false).text, "Analyzing");
-  assert.deepEqual(pill(done, true), { kind: "warn", text: "2 issues found" }); // non_compete, renewal_term
+  assert.deepEqual(pill(done, true), { kind: "warn", text: "2 issues found", stage: "click to review" }); // non_compete, renewal_term
 
   const clean = structuredClone(done);
   Object.values(clean.result!.fields).forEach((f) => (f.needs_review = false));
-  assert.deepEqual(pill(clean, true), { kind: "ok", text: "Passed" });
+  assert.deepEqual(pill(clean, true), { kind: "ok", text: "Passed", stage: undefined });
 });
 
 test("an error event ends the run, with the server's words", () => {

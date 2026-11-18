@@ -1,4 +1,4 @@
-.PHONY: install data test lint fmt serve stats nb phoenix web-install web web-test app
+.PHONY: install data test lint fmt serve stats nb phoenix web-install web web-test app e2e
 
 install:  ## install all deps (incl. dev) into .venv
 	uv sync
@@ -44,3 +44,6 @@ web-test:  ## check the UI's types, then run its test
 app:  ## build the UI into web/dist, then serve the UI and the API on http://localhost:8000
 	cd web && npm run build
 	uv run uvicorn docintel.api.app:app --no-access-log
+
+e2e:  ## build the UI, then run the Playwright test on a stored answer (no model call); VIDEO=1 records it
+	cd web && npm run build && npx playwright test

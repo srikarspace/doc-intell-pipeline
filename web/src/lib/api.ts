@@ -15,12 +15,14 @@ export type Sample = {
   doc_id: string;
 };
 
+export type Rect = [number, number, number, number]; // x0, y0, x1, y1 in PDF points, y from the bottom
+
 export type Highlight = {
-  // domain/locate.py: boxes in PDF points, y from the bottom of the page
+  // domain/locate.py
   quote_index: number;
-  page: number;
-  page_size: [number, number];
-  rects: [number, number, number, number][];
+  page: number; // from 1
+  page_size: [number, number]; // width, height in PDF points
+  rects: Rect[];
 };
 
 export type Issue = {
@@ -31,10 +33,12 @@ export type Issue = {
   detail: string;
 };
 
+export type Value = string | string[] | null; // api/schemas.py
+
 export type FieldResult = {
   // domain/pipeline.py
   found: boolean;
-  value: string | string[] | null;
+  value: Value;
   quotes: string[];
   needs_review: boolean;
   issues: Issue[];
@@ -54,7 +58,16 @@ export type ExtractResult = {
   latency_ms: number;
 };
 
-// The events of POST /v1/extract/stream, plus `http_error` for an answer that is not a stream.
+export type ReviewSaved = {
+  // api/schemas.py
+  review_id: string;
+  field: string;
+  action: "accept" | "modify";
+  old: Value;
+  new: Value;
+};
+
+// The events of POST /v1/extract/stream. An answer that is not a stream also becomes an `error` event.
 export type StreamEvent =
   | { event: "stage"; data: { name: "parse" | "extract" | "check"; status: "start" | "done"; parser?: string; pages?: number } }
   | { event: "attempt"; data: { n: number; errors: number } }
@@ -63,14 +76,14 @@ export type StreamEvent =
 
 export type Input = { sampleId: string } | { pdf: File };
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path);
-  if (!response.ok) throw new Error(`${path}: ${response.status}`);
-  return response.json() as Promise<T>;
+/** An HTTP error with FastAPI's message, so the UI can show it. */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
 }
-
-export const getFields = () => getJson<FieldInfo[]>("/v1/fields");
-export const getSamples = () => getJson<Sample[]>("/v1/samples");
 
 /** FastAPI puts a message in `detail`: a string, or a list of problems for a 422. */
 function detailText(body: unknown): string {
@@ -79,6 +92,31 @@ function detailText(body: unknown): string {
   if (Array.isArray(detail)) return detail.map((d) => d?.msg ?? String(d)).join("; ");
   return "the server gave no reason";
 }
+
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, init);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(response.status, detailText(body));
+  }
+  return (response.status === 204 ? undefined : await response.json()) as T;
+}
+
+export const getFields = () => call<FieldInfo[]>("/v1/fields");
+export const getSamples = () => call<Sample[]>("/v1/samples");
+export const samplePdfUrl = (id: string) => `/v1/samples/${encodeURIComponent(id)}/pdf`;
+
+export type ReviewInput = { request_id: string; field: string; action: "accept" | "modify"; value?: Value };
+
+export const postReview = (body: ReviewInput) =>
+  call<ReviewSaved>("/v1/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const deleteReview = (reviewId: string) =>
+  call<void>(`/v1/reviews/${encodeURIComponent(reviewId)}`, { method: "DELETE" });
 
 /**
  * Start an extract and call `onEvent` for each event, in order.

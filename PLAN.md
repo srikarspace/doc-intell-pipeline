@@ -295,8 +295,9 @@ day. Parts were merged to fit; the router and the free-text planner are cut (REA
 | 3 | 4a2 | highlights + stream | quote -> page boxes (`locate`), evidence lines for "maybe missed", stage events, `POST /v1/extract/stream` (SSE) | done |
 | 3 | 4b | traces + logs | request_id middleware, structlog JSON logs, OTel spans (parse, extract, attempt, check, highlight) + OpenInference, local Phoenix (`make phoenix`), how to read a trace | done |
 | 3 | 4b2 | requests + reviews | `requests` + `reviews` in DuckDB, `POST /v1/reviews` + `DELETE` undo, `make stats` (p50/p95/errors/cost) | done |
-| 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | doc ready |
-| 3 | 4c2 | UI review + demo | react-pdf pane + quote and evidence highlights, review card (Modify / Accept, undo), Passed, Copy JSON, one Playwright e2e, demo video | planned |
+| 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | done |
+| 3 | 4c2 | PDF pane + highlights | UI split into `lib/`, `hooks/`, `features/`; react-pdf pane, quote boxes, evidence boxes in amber, click to scroll and pulse | doc ready |
+| 3 | 4c3 | review + e2e + demo | review card (Modify / Accept, undo), Passed, Copy JSON, fixtures from stored answers, one Playwright e2e, demo script | doc ready |
 | 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
 
 ---
@@ -573,7 +574,7 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > eventsource-parser for the stream. `make web` (Vite dev server with a proxy to the API) and `make app` (build
 > `web/dist`, then FastAPI serves it with the API). Claude may scaffold; the user reviews and explains it back."
 
-> For 4c and 4c2, Claude writes the UI code too (the user's choice: strong UI experience), and the doc is a "read and
+> For 4c, 4c2 and 4c3, Claude writes the UI code too (the user's choice: strong UI experience), and the doc is a "read and
 > run" walkthrough. The user reviews the code and explains it back before committing. The test uses Node's own runner
 > (`node --test`), because npm 10.9.2 crashes when it installs vitest.
 
@@ -582,6 +583,11 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > words, quote or evidence, Modify / Accept, undo -> `/v1/reviews`), then open the next flagged row. Passed when all
 > are resolved, Copy JSON of the reviewed answer. One Playwright e2e on one sample. Record the demo video for the
 > write-up. Claude may scaffold; the user reviews and explains it back."
+
+> The 4c2 prompt did not fit one doc, so it is split in two (user's choice). 4c2 also splits the UI into `lib/`
+> (pure rules), `hooks/` (effects) and `features/` (screens), as the user asked. 4c3 is the review card, Passed, Copy
+> JSON, the e2e test and the demo script. The e2e test uses stored answers from `requests` as fixtures (user's idea):
+> `web/e2e/fixtures.py export` and `seed`, so it never calls the model.
 
 ---
 

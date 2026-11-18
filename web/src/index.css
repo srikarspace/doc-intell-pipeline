@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
-/* daisyUI gives the components (btn, badge, skeleton, ...). Our two themes give the colors. */
+/* daisyUI gives the components (btn, badge, skeleton, ...). Our two themes give the colors.
+   `join` is left out: we do not use it, and its CSS gives two build warnings. */
 @plugin "daisyui" {
   themes: false;
+  exclude: join;
 }
 
 /* The prototype's colors. One accent (primary) for buttons, chips and the loading ring.
@@ -105,6 +107,32 @@ body {
 @keyframes turn {
   to {
     --turn: 360deg;
+  }
+}
+
+/* The boxes on the PDF. A quote in the accent color, an evidence line in amber. */
+.mark-quote {
+  background: color-mix(in oklab, #6656f0 26%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, #6656f0 70%, transparent);
+}
+.mark-evidence {
+  background: color-mix(in oklab, #f5a524 34%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, #d68700 85%, transparent);
+}
+.mark-pulse {
+  animation: mark-pulse 1.1s ease-out 2;
+}
+@keyframes mark-pulse {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in oklab, #6656f0 70%, transparent);
+  }
+}
+.mark-evidence.mark-pulse {
+  animation-name: mark-pulse-evidence;
+}
+@keyframes mark-pulse-evidence {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in oklab, #d68700 85%, transparent);
   }
 }
 
