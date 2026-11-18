@@ -55,7 +55,7 @@ def test_a_large_file_is_refused(api, monkeypatch):
 
 def test_a_slow_request_times_out(api, monkeypatch):
     monkeypatch.setattr(routes, "TIMEOUT_S", 0.05)
-    monkeypatch.setattr(routes, "run_pipeline", lambda *args: time.sleep(0.5))
+    monkeypatch.setattr(routes, "run_pipeline", lambda *args, **kwargs: time.sleep(0.5))
     assert post(api, ["parties"]).status_code == 504
 
 

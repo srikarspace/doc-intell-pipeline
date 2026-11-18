@@ -5,6 +5,7 @@ import uuid
 from collections.abc import Callable
 from pathlib import Path
 
+from opentelemetry import trace
 from pydantic import BaseModel
 
 from docintel.domain.extract.retry import extract_with_retry, final_answer
@@ -20,6 +21,7 @@ TEXT_CHARS_PER_PAGE = 200  # below this, the PDF is a scan; the thinnest dev con
 MAX_PAGES = 100  # the longest dev contract has 82
 MAX_SCAN_PAGES = 10  # Docling OCR reads about 7 to 12 s per page on an 8 GB Mac
 EXTRACT_MAX_TOKENS = 20_000  # the largest real extraction answer used 17,999
+tracer = trace.get_tracer(__name__)
 
 
 class TooLong(ValueError):
@@ -88,42 +90,56 @@ def run_pipeline(
     document: Document,
     client=None,
     on_event: Emit = no_events,
+    request_id: str | None = None,
 ) -> ExtractResult:
-    """Parse, extract all 12 with retries, check, keep the chosen fields. Reports each step."""
+    """Parse, extract all 12 with retries, check, keep the chosen fields. One span per step."""
+    request_id = request_id or str(uuid.uuid4())
     start = time.perf_counter()
-    on_event("stage", {"name": "parse", "status": "start"})
-    doc = parse_pdf(pdf_path)
-    done = {"name": "parse", "status": "done", "parser": doc.parser_name, "pages": len(doc.pages)}
-    on_event("stage", done)
-    on_event("stage", {"name": "extract", "status": "start"})
-    attempts = extract_with_retry(
-        doc.text,
-        client=client,
-        max_tokens=EXTRACT_MAX_TOKENS,
-        on_attempt=lambda a: on_event("attempt", {"n": a.attempt_no, "errors": len(a.errors)}),
-    )
-    answer = final_answer(attempts)
-    if answer is None:
-        raise NoAnswer("the model gave no answer that fits the schema")
-    on_event("stage", {"name": "check", "status": "start"})
-    issues = check_answer(answer, doc.text)  # rule errors and review warnings
-    text_layer = doc.parser_name == "pypdf"
     chosen = [f for f in FIELDS if f in fields] or list(FIELDS)  # schema order, no repeats
-    results = {}
-    for name in chosen:
-        own = [i for i in issues if i.field == name]
-        part = getattr(answer, name).model_dump()
-        evidence = [line_around(doc.text, i.detail) for i in own if i.rule == "maybe_missed"]
-        results[name] = FieldResult(
-            **part,
-            needs_review=bool(own),
-            issues=own,
-            highlights=boxes(pdf_path, part["quotes"], text_layer),
-            evidence=evidence,
-            evidence_highlights=boxes(pdf_path, evidence, text_layer),
-        )
+    about = {"request_id": request_id, "sample_id": document.sample_id or "", "fields": chosen}
+    with tracer.start_as_current_span("pipeline", attributes=about):
+        with tracer.start_as_current_span("parse") as span:
+            on_event("stage", {"name": "parse", "status": "start"})
+            doc = parse_pdf(pdf_path)
+            span.set_attributes({"parser": doc.parser_name, "pages": len(doc.pages)})
+            done = {"name": "parse", "status": "done", "parser": doc.parser_name}
+            on_event("stage", done | {"pages": len(doc.pages)})
+        with tracer.start_as_current_span("extract"):
+            on_event("stage", {"name": "extract", "status": "start"})
+            attempts = extract_with_retry(
+                doc.text,
+                client=client,
+                max_tokens=EXTRACT_MAX_TOKENS,
+                on_attempt=lambda a: on_event(
+                    "attempt", {"n": a.attempt_no, "errors": len(a.errors)}
+                ),
+            )
+            answer = final_answer(attempts)
+            if answer is None:
+                raise NoAnswer("the model gave no answer that fits the schema")
+        with tracer.start_as_current_span("check") as span:
+            on_event("stage", {"name": "check", "status": "start"})
+            issues = check_answer(answer, doc.text)  # rule errors and review warnings
+            span.set_attribute("issues", len(issues))
+        with tracer.start_as_current_span("highlight"):
+            text_layer = doc.parser_name == "pypdf"
+            results = {}
+            for name in chosen:
+                own = [i for i in issues if i.field == name]
+                part = getattr(answer, name).model_dump()
+                evidence = [
+                    line_around(doc.text, i.detail) for i in own if i.rule == "maybe_missed"
+                ]
+                results[name] = FieldResult(
+                    **part,
+                    needs_review=bool(own),
+                    issues=own,
+                    highlights=boxes(pdf_path, part["quotes"], text_layer),
+                    evidence=evidence,
+                    evidence_highlights=boxes(pdf_path, evidence, text_layer),
+                )
     return ExtractResult(
-        request_id=str(uuid.uuid4()),
+        request_id=request_id,
         document=document,
         fields=results,
         needs_review=any(r.needs_review for r in results.values()),

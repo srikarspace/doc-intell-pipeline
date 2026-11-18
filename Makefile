@@ -18,7 +18,13 @@ fmt:  ## auto-fix lint + format
 	uv run ruff format .
 
 serve:  ## run the API on http://localhost:8000
-	uv run uvicorn docintel.api.app:app --reload
+	uv run uvicorn docintel.api.app:app --reload --no-access-log
 
 nb:  ## launch Jupyter Lab in notebooks/
 	uv run jupyter lab notebooks/
+
+phoenix:  ## run Phoenix on http://localhost:6006 (traces are kept in data/phoenix/)
+	PHOENIX_WORKING_DIR=data/phoenix PHOENIX_TELEMETRY_ENABLED=false \
+	PHOENIX_AGENTS_DISABLE_BASH=true PHOENIX_AGENTS_DISABLE_WEB_ACCESS=true \
+	PHOENIX_AGENTS_DISABLE_GITHUB=true \
+	uvx --from arize-phoenix==21.0.0 phoenix serve

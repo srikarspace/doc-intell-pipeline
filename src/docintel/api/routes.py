@@ -8,7 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+import structlog
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sse_starlette import EventSourceResponse
@@ -18,6 +19,9 @@ from docintel.api.samples import Sample, load_samples, sample_pdf
 from docintel.api.schemas import Health
 from docintel.domain.pipeline import Document, ExtractResult, NoAnswer, TooLong, run_pipeline
 from docintel.domain.schema.fields import FieldName
+
+router = APIRouter()
+log = structlog.get_logger()
 
 VERSION = "0.1.0"
 MAX_BYTES = 10 * 1024 * 1024  # the largest dev PDF is 0.48 MB; scans are bigger
@@ -66,6 +70,23 @@ def as_http(error: Exception) -> HTTPException:
     return HTTPException(status, detail)
 
 
+def finished(result: ExtractResult) -> None:
+    """One log line per answer. Never the contract text: it can be private."""
+    log.info(
+        "extract.done",
+        parser=result.parser,
+        pages=result.pages,
+        fields=len(result.fields),
+        needs_review=result.needs_review,
+        cost_usd=result.cost_usd,
+        latency_ms=result.latency_ms,
+    )
+
+
+def failed(error: HTTPException) -> None:
+    log.warning("extract.failed", status=error.status_code, detail=error.detail)
+
+
 async def read_input(pdf: UploadFile | None, sample_id: str | None) -> tuple[bytes, Document]:
     """The PDF bytes and their `Document`, from an upload or from a sample. Exactly one."""
     if (pdf is None) == (sample_id is None):
@@ -88,6 +109,7 @@ async def read_input(pdf: UploadFile | None, sample_id: str | None) -> tuple[byt
 @router.post("/v1/extract")
 async def extract(
     client: Annotated[object, Depends(get_llm_client)],
+    request: Request,
     pdf: UploadFile | None = None,
     sample_id: Annotated[str | None, Form()] = None,
     fields: Annotated[list[FieldName] | None, Form()] = None,  # none: all 12
@@ -97,17 +119,29 @@ async def extract(
         path = Path(folder) / "upload.pdf"
         path.write_bytes(data)
         try:
-            return await asyncio.wait_for(
-                run_in_threadpool(run_pipeline, path, fields or [], document, client),
+            result = await asyncio.wait_for(
+                run_in_threadpool(
+                    run_pipeline,
+                    path,
+                    fields or [],
+                    document,
+                    client,
+                    request_id=request.state.request_id,
+                ),
                 timeout=TIMEOUT_S,
             )
         except tuple(KNOWN_ERRORS) as e:
-            raise as_http(e) from None
+            error = as_http(e)
+            failed(error)
+            raise error from None
+    finished(result)
+    return result
 
 
 @router.post("/v1/extract/stream")
 async def extract_stream(
     client: Annotated[object, Depends(get_llm_client)],
+    request: Request,
     pdf: UploadFile | None = None,
     sample_id: Annotated[str | None, Form()] = None,
     fields: Annotated[list[FieldName] | None, Form()] = None,
@@ -126,14 +160,25 @@ async def extract_stream(
     async def work() -> None:
         try:
             result = await asyncio.wait_for(
-                run_in_threadpool(run_pipeline, path, fields or [], document, client, emit),
+                run_in_threadpool(
+                    run_pipeline,
+                    path,
+                    fields or [],
+                    document,
+                    client,
+                    emit,
+                    request_id=request.state.request_id,
+                ),
                 timeout=TIMEOUT_S,
             )
+            finished(result)
             await queue.put(("result", result.model_dump(mode="json")))
         except tuple(KNOWN_ERRORS) as e:
             error = as_http(e)
+            failed(error)
             await queue.put(("error", {"status": error.status_code, "detail": error.detail}))
         except Exception:  # a bug: say so, without the details
+            log.exception("extract.crashed")
             await queue.put(("error", {"status": 500, "detail": "internal error"}))
         finally:
             await queue.put(None)  # the end

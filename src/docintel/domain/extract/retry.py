@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from opentelemetry import trace
+
 from docintel.core.llm import LLMResult, call_llm
 from docintel.domain.extract.extract import PROMPTS, build_messages
 from docintel.domain.schema.fields import ContractFields
@@ -9,6 +11,7 @@ from docintel.domain.validate.issues import Issue
 from docintel.domain.validate.rules import check_result
 
 FEEDBACK = PROMPTS / "retry.md"
+tracer = trace.get_tracer(__name__)
 
 
 @dataclass
@@ -52,10 +55,12 @@ def extract_with_retry(
     messages = build_messages(text, prompt_version)
     attempts = []
     for attempt_no in range(max_retries + 1):
-        result = call_llm(
-            messages, ContractFields, model=model, client=client, max_tokens=max_tokens
-        )
-        attempt = Attempt(attempt_no, result, check_result(result, text))
+        with tracer.start_as_current_span("attempt", attributes={"n": attempt_no}) as span:
+            result = call_llm(
+                messages, ContractFields, model=model, client=client, max_tokens=max_tokens
+            )
+            attempt = Attempt(attempt_no, result, check_result(result, text))
+            span.set_attributes({"errors": len(attempt.errors), "cost_usd": result.cost_usd or 0.0})
         attempts.append(attempt)
         if on_attempt:
             on_attempt(attempt)

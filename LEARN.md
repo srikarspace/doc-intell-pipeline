@@ -218,12 +218,39 @@ We are building a doc intel pipeline. It looks at the pdf docs and returns the d
 - For scanned PDFs pypdf always fails as there is no text in the pdfs. In that case the only option we have is Docling or Vision models.
 
 # Phase 4:
-- Added an API to parse and return page labels with quotes
-- Added error scenarios like timeout, too long, no answer
-- Also added some sample pdf's so that users can use them to test
-- Also making the API SSE(server side events) so that we can display it in the UI for user understanding instead of single spinner
-- We can only highlight pdfs only when text is available for scanned pdfs that is not possible.
-- We return the boxes for each quote. The boxes are coordinates in the page(x0, y0, x1, y1) so that UI can use them to highlight.
+- API and SSE
+    - Added an API to parse and return page labels with quotes
+    - Added error scenarios like timeout, too long, no answer
+    - Also added some sample pdf's so that users can use them to test
+    - Also making the API SSE(server side events) so that we can display it in the UI for user understanding instead of single spinner
+    - We can only highlight pdfs only when text is available for scanned pdfs that is not possible.
+    - We return the boxes for each quote. The boxes are coordinates in the page(x0, y0, x1, y1) so that UI can use them to highlight.
+
+- Traces and logs
+    - We track each request with an id. 
+    - Multiple steps in the labels parsing can be found in Phoenix. This is a trace.
+    - We add this logic to middleware. Everything before and after the request will be tracked.
+        - Span: one times step, with start, end and some facts
+        - Trace: all the spans with in a request as a tree. A span with in a span.
+        - OpenTelemetry(Otel): a standard library and format for spans so that any tool can read them.
+        - Tracer provide: an object that tell where spans go. With no object spans go no where.
+        - Exporter: the part that sends finished spans to some location like Phoenix.
+        - Auto-tracer: A library that makes spans for another library calls like OpenInferance makes spans for OpenAI API calls
+    - Note: One request gets just one id. It is used in header, the answer, every log and every span. Logs say what happened, traces say where time was spent. One id three views: answer, logs, traces.
+    - Why we add traces and logs:
+        - If the request is slow, we can look into traces and check span and wee which span took most time and we know what to fix.
+        - A retry cost, we can use the id and look into traces and know which when the cost is increasing.
+        - A user can send what they can see. We can take the request_id and use it to find logs and traces.
+    - Design:
+        - The id is made in the middleware at the start of the request so that any failure can also be tracked.
+        - One span per step: parse, extract, attempt, check and highlight.
+        - Only extract routes are traced. As `/health` would generate log of unnecessary traces.
+        - Logs hold numbers and names not contract text or keys.
+    - Changes
+        - One id per request
+        - the routes pass the id and log the results with different log types
+        - add spans in the pipeline
+        - Now we use phynix and turn tracing on so that we can see traces
 
 
 
