@@ -54,9 +54,10 @@ def sent() -> list:
 
 
 @pytest.fixture
-def api(monkeypatch, sent) -> TestClient:
-    """A TestClient with the fake model and the fake parser."""
+def api(monkeypatch, sent, tmp_path) -> TestClient:
+    """A TestClient with the fake model, the fake parser and a new, empty database."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    monkeypatch.setenv("APP_DB", str(tmp_path / "app.duckdb"))
     get_settings.cache_clear()
     monkeypatch.setattr(pipeline, "parse_pdf", lambda path: from_pages([CONTRACT], 0.0, 1, "pypdf"))
     monkeypatch.setattr(pipeline, "locate", lambda path, quotes: [])  # the fake PDF has no pages

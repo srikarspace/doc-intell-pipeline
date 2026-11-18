@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     llm_timeout_s: float = 120.0
     llm_max_attempts: int = 4  # 1 try + 3 retries, only for network errors and 429
     tracing: bool = True  # send spans to the local Phoenix; TRACING=false turns it off
+    app_db: str = "data/docintel.duckdb"  # requests and reviews; tests use a temp file
 
 
 @lru_cache

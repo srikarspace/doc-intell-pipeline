@@ -9,14 +9,15 @@ from pathlib import Path
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sse_starlette import EventSourceResponse
 
 from docintel.api.fields import FIELD_INFO, FieldInfo
 from docintel.api.samples import Sample, load_samples, sample_pdf
-from docintel.api.schemas import Health
+from docintel.api.schemas import Health, Review, ReviewSaved
+from docintel.db import app_data
 from docintel.domain.pipeline import Document, ExtractResult, NoAnswer, TooLong, run_pipeline
 from docintel.domain.schema.fields import FieldName
 
@@ -30,6 +31,11 @@ KNOWN_ERRORS = {  # error type -> HTTP status; anything else is a bug (500)
     TimeoutError: 504,
     TooLong: 413,
     NoAnswer: 502,
+}
+REVIEW_ERRORS = {
+    app_data.NoRequest: 404,
+    app_data.NotAsked: 422,
+    app_data.AlreadyReviewed: 409,
 }
 
 
@@ -70,8 +76,8 @@ def as_http(error: Exception) -> HTTPException:
     return HTTPException(status, detail)
 
 
-def finished(result: ExtractResult) -> None:
-    """One log line per answer. Never the contract text: it can be private."""
+def finished(request: Request, fields: list[str], result: ExtractResult) -> None:
+    """One log line and one row per answer. Never log the contract text: it can be private."""
     log.info(
         "extract.done",
         parser=result.parser,
@@ -81,10 +87,21 @@ def finished(result: ExtractResult) -> None:
         cost_usd=result.cost_usd,
         latency_ms=result.latency_ms,
     )
+    app_data.save_request(
+        request.state.request_id, request.url.path, result.document, fields, result=result
+    )
 
 
-def failed(error: HTTPException) -> None:
+def failed(request: Request, document: Document, fields: list[str], error: HTTPException) -> None:
     log.warning("extract.failed", status=error.status_code, detail=error.detail)
+    app_data.save_request(
+        request.state.request_id,
+        request.url.path,
+        document,
+        fields,
+        status=error.status_code,
+        error=error.detail,
+    )
 
 
 async def read_input(pdf: UploadFile | None, sample_id: str | None) -> tuple[bytes, Document]:
@@ -132,9 +149,9 @@ async def extract(
             )
         except tuple(KNOWN_ERRORS) as e:
             error = as_http(e)
-            failed(error)
+            failed(request, document, fields or [], error)
             raise error from None
-    finished(result)
+    finished(request, fields or [], result)
     return result
 
 
@@ -171,11 +188,11 @@ async def extract_stream(
                 ),
                 timeout=TIMEOUT_S,
             )
-            finished(result)
+            finished(request, fields or [], result)
             await queue.put(("result", result.model_dump(mode="json")))
         except tuple(KNOWN_ERRORS) as e:
             error = as_http(e)
-            failed(error)
+            failed(request, document, fields or [], error)
             await queue.put(("error", {"status": error.status_code, "detail": error.detail}))
         except Exception:  # a bug: say so, without the details
             log.exception("extract.crashed")
@@ -194,3 +211,22 @@ async def extract_stream(
             shutil.rmtree(folder, ignore_errors=True)
 
     return EventSourceResponse(events())
+
+
+@router.post("/v1/reviews", status_code=201)
+def review(body: Review) -> ReviewSaved:
+    """Accept or modify one field. One review per field: undo it to change your mind."""
+    try:
+        saved = app_data.save_review(body.request_id, body.field, body.action, body.value)
+    except tuple(REVIEW_ERRORS) as e:
+        raise HTTPException(REVIEW_ERRORS[type(e)], str(e)) from None
+    log.info("review.saved", extract_id=body.request_id, field=body.field, action=body.action)
+    return ReviewSaved(**saved)
+
+
+@router.delete("/v1/reviews/{review_id}", status_code=204)
+def undo(review_id: str) -> Response:
+    if not app_data.undo_review(review_id):
+        raise HTTPException(404, f"no review {review_id!r}")
+    log.info("review.undone", review_id=review_id)
+    return Response(status_code=204)

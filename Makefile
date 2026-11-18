@@ -1,4 +1,4 @@
-.PHONY: install data test lint fmt nb
+.PHONY: install data test lint fmt serve stats nb phoenix
 
 install:  ## install all deps (incl. dev) into .venv
 	uv sync
@@ -19,6 +19,9 @@ fmt:  ## auto-fix lint + format
 
 serve:  ## run the API on http://localhost:8000
 	uv run uvicorn docintel.api.app:app --reload --no-access-log
+
+stats:  ## p50, p95, errors and cost of the app requests, and the review counts
+	uv run python -m docintel.db.app_data
 
 nb:  ## launch Jupyter Lab in notebooks/
 	uv run jupyter lab notebooks/
