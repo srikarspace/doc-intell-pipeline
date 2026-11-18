@@ -1,4 +1,4 @@
-.PHONY: install data test lint fmt serve stats nb phoenix web-install web web-test app e2e
+.PHONY: install data test lint fmt serve stats nb phoenix web-install web web-test app e2e clean
 
 install:  ## install all deps (incl. dev) into .venv
 	uv sync
@@ -47,3 +47,7 @@ app:  ## build the UI into web/dist, then serve the UI and the API on http://loc
 
 e2e:  ## build the UI, then run the Playwright test on a stored answer (no model call); VIDEO=1 records it
 	cd web && npm run build && npx playwright test
+
+clean:  ## delete caches and builds (keeps data/, .venv/ and web/node_modules/)
+	find . -name __pycache__ -type d -not -path './.venv/*' -prune -exec rm -rf {} +
+	rm -rf .pytest_cache .ruff_cache notebooks/.ipynb_checkpoints web/dist web/test-results web/playwright-report

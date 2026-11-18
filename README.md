@@ -1,143 +1,195 @@
 # doc-intell-pipeline
 
-Contract PDFs in, cited and validated JSON out. Each answer comes with the exact quote from the contract and a needs-review flag.
+Contract PDFs in, cited and validated JSON out. Every answer comes with the exact quote from the contract, a box
+around that quote in the PDF, and a needs-review flag that a person can accept or fix.
 
-Built from **Project 1: Document intelligence pipeline** in [AI Engineer Projects](https://github.com/aishwaryanr/awesome-generative-ai-guide/blob/main/youtube/ai-engineer-projects.md) by Aishwarya Reganti ([aishwaryanr/awesome-generative-ai-guide](https://github.com/aishwaryanr/awesome-generative-ai-guide)). The project uses CUAD and measures precision and recall per field.
+![The app: answers on the left, the contract on the right, a flagged field under review](figures/app.png)
 
-## What it answers
+Built on [CUAD](https://www.atticusprojectai.org/cuad) (510 contracts labelled by lawyers), and measured with
+precision, recall and F1 per field. The project idea comes from Aishwarya Reganti (see [Acknowledgements](#acknowledgements)).
 
-1. Which documents did we choose, and why?
-2. OCR-style parsing or multimodal parsing: which gives better quality for the cost?
-3. Which fields does the model handle well or badly, and why?
-4. Schema validation: what broke, what we caught, and did retries help?
+## Features
 
-## Status
+- **12 contract fields** in 4 groups: parties, dates, governing law, yes or no clauses (non-compete, change of
+  control, anti-assignment), renewal and liability terms, license and IP.
+- **Cited answers.** Each answer quotes the contract. A citation check confirms the quote is really in the text.
+- **Trust layer.** Schema and content rules, review flags (for example "the model said not found, but this line
+  mentions renewal"), and repair retries that send the errors back to the model.
+- **Three parsers:** pypdf, Docling (with OCR for scans) and a vision LLM, compared on clean PDFs and fake scans.
+- **Review app.** Pick fields, drop a PDF or pick a sample, watch the live stages, click an answer to see its quote in
+  the PDF, then Accept or Modify each flag. Copy the reviewed answer as JSON.
+- **Measured.** An eval runner with a `run_id` for every run, cost and latency per call, and local traces in Phoenix.
 
-| Phase | Parts | Status |
-|---|---|---|
-| 0 setup + data | [0a](./learn/phase-0a.md) setup · [0b](./learn/phase-0b.md) loader · [0c](./learn/phase-0c.md) explore · [0d](./learn/phase-0d.md) fields + split | done |
-| 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | done |
-| 2 trust layer | [2a](./learn/phase-2a.md) validators + citations · [2a2](./learn/phase-2a2.md) needs-review rules · [2b](./learn/phase-2b.md) retry loop · [2b2](./learn/phase-2b2.md) trust replay tool · [2b3](./learn/phase-2b3.md) trust run | done |
-| 3 parser comparison | [3a](./learn/phase-3a.md) interface + pypdf · [3a2](./learn/phase-3a2.md) Docling · [3a3](./learn/phase-3a3.md) vision LLM · [3b](./learn/phase-3b.md) fake scans + CER · [3b2](./learn/phase-3b2.md) experiment design · [3b3](./learn/phase-3b3.md) E3 run | done |
-| 4 product | [4a](./learn/phase-4a.md) API · [4a2](./learn/phase-4a2.md) highlights + stream · [4b](./learn/phase-4b.md) traces + logs · [4b2](./learn/phase-4b2.md) requests + reviews · [4c](./learn/phase-4c.md) UI shell · [4c2](./learn/phase-4c2.md) PDF + highlights · [4c3](./learn/phase-4c3.md) review + e2e | in progress (4a to 4c done) |
-| 5 write-up | figures, README, mock interview | planned |
+## Results
 
-## Results so far (dev, 52 contracts, 12 fields)
+All numbers are on the dev split (52 contracts, 12 fields). The test split is kept for final numbers.
 
-| Experiment | What changed | F1 |
-|---|---|---|
-| E1 | Qwen3-235B, prompt v1 | 0.705 |
-| E1.1 | DeepSeek V4 Flash, same prompt. Tied with the other new models, kept for cost and p95 | 0.801 |
-| E1.2 | Fairer scoring rules, same stored answers, no new calls (E1 becomes 0.827) | 0.912 |
-| E1.3 | Prompt v2 for 4 weak fields, on Parasail. Not kept: the gain could be zero, and it failed the keep rule written before the run | 0.917 (v1 on Parasail: 0.907) |
-| E2.0 | Validation and review flags on the E1.2 run, no new calls. Errors 0.5% of fields, needs review 5.6%, 0 made-up quotes | 0.912 |
-| E2.1 | Blank fields with a validation error, on the first answers of a `--retries 2` run on Parasail. Not kept: lost 3 right answers | 0.903 -> 0.899 |
-| E2.2 | Also blank fields whose quote is not in the contract. Not kept: both caught quotes were right answers with copy errors | 0.903 -> 0.895 |
-| E2.3 | Repair retries (max 2). Kept by the rule written before the run: 1 field fixed, 0 lost, +7% cost | 0.903 -> 0.903 |
+| What | Result |
+|---|---|
+| Extraction, DeepSeek V4 Flash, prompt v1 | F1 **0.912** (P 0.890, R 0.935), about $0.004 per contract |
+| Baseline, Qwen3-235B, same rules | F1 0.827 (gap +0.085, 95% range +0.053 to +0.118) |
+| Validation on stored answers | errors on 0.5% of fields, 5.6% flagged for review, 0 made-up quotes |
+| Repair retries (max 2) | 1 field fixed, 0 lost, +7% cost: kept |
+| Blank fields that fail a rule | lost right answers: not kept |
+| Weakest fields | non-compete (0.67), change of control (0.70), notice to stop renewal (0.70) |
 
-E1 and E1.1 use the old scoring rules. Phase 2 builds on the E1.2 row: DeepSeek V4 Flash, prompt v1,
-run `20261102-200003`. E2.1 to E2.3 come from one run, `20261108-062221`: its first answers are the
-"before" and its final answers the "after". Details and limits are in [EXPERIMENTS.md](./EXPERIMENTS.md).
-Test split numbers come at the end.
+Parsers, on 9 dev contracts (69 pages), each through the same pipeline (cost is per contract, parse plus extract):
 
-## Parser comparison (E3: dev, 9 contracts, 69 pages)
-
-Each parser's text goes through the same Phase 2 pipeline. The scans are fake: PDF pages turned into pictures, then
-turned, blurred and given noise, at two levels.
-
-| Input | Best choice | F1 | Vision F1 | Gap, 95% range | Total cost per contract |
+| Input | Best choice | Docling F1 | Vision LLM F1 | Docling cost | Vision LLM cost |
 |---|---|---|---|---|---|
-| PDF with a text layer | Docling (no OCR) | 0.91 | 0.81 | +0.097 (+0.014 to +0.189) | $0.0013 against $0.025 |
-| Mild scan | Docling OCR | 0.89 | 0.84 | -0.051 (-0.14 to +0.03), could be zero | $0.0015 against $0.025 |
-| Heavy scan | vision LLM | 0.78 (OCR) | 0.90 | +0.123 (+0.03 to +0.24) | $0.042 against $0.0035 |
+| PDF with a text layer | Docling (no OCR) | 0.91 | 0.81 | $0.0013 | $0.025 |
+| Mild scan | Docling OCR | 0.89 | 0.84 | $0.0015 | $0.025 |
+| Heavy scan | vision LLM | 0.78 | 0.90 | $0.0035 | $0.042 |
 
 ![Quality against cost for each scan condition](figures/e3_quality_cost.png)
 
-Vision is worth its cost only on heavy damage. There, OCR loses most label quotes (CER 0.24). The vision cost
-includes 2 failed page calls (empty answers at the token limit) that passed on a retry. Details and limits are in
-[EXPERIMENTS.md](./EXPERIMENTS.md), E3.
+A vision LLM is worth its cost only on heavily damaged scans. Every number traces to a `run_id`; the setups,
+confidence ranges and limits are in [EXPERIMENTS.md](./EXPERIMENTS.md).
 
-There are two notes for each part. `learn/phase-N.md` covers what the part builds and why. `learn/py/phase-N.md` covers the Python it uses. The full plan is in [PLAN.md](./PLAN.md), and runs are logged in [EXPERIMENTS.md](./EXPERIMENTS.md).
+## How it works
 
-## Stack
+One request, from the browser to the model and back:
 
-Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers · FastAPI + sse-starlette (API and live stream) · pypdfium2 (quote boxes) · structlog JSON logs and local Phoenix traces · React + Vite + TypeScript + Tailwind + daisyUI, TanStack Query, eventsource-parser, react-pdf (UI, served by FastAPI) · Playwright (one e2e test on a stored answer).
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as React app
+    participant API as FastAPI
+    participant P as Pipeline
+    participant LLM as OpenRouter
+    participant DB as DuckDB
 
-It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
+    User->>UI: pick fields, drop a PDF or pick a sample
+    UI->>API: POST /v1/extract/stream (PDF or sample id, fields)
+    API->>P: run_pipeline
+    P->>P: parse with pypdf, or Docling OCR for a scan
+    P-->>UI: SSE stage parse (pages)
+    loop 1 call, plus up to 2 repair retries while rules fail
+        P->>LLM: extract all 12 fields (JSON schema)
+        LLM-->>P: answer with quotes
+        P->>P: validate with schema and content rules
+        P-->>UI: SSE attempt (errors found)
+    end
+    P->>P: check citations and add review flags
+    P->>P: locate each quote as boxes on its page
+    P-->>API: answer (values, quotes, boxes, flags, cost)
+    API->>DB: save the request and its answer
+    API-->>UI: SSE result
+    UI-->>User: answers one by one, PDF with the quote boxes
+    User->>UI: Accept or Modify a flagged field
+    UI->>API: POST /v1/reviews
+    API->>DB: save the review (old value from the stored answer)
+    API-->>UI: 201 saved
+    UI-->>User: next flag, then Passed
+```
+
+The SSE events pass through FastAPI as they happen, so the UI shows each stage live. Every step is also a span in
+the local Phoenix traces.
+
+The same function, `run_pipeline` in `src/docintel/domain/pipeline.py`, runs these steps for the eval runner. The
+model always extracts all 12 fields; the API returns the ones you picked.
 
 ## Quickstart
 
+You need Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 22.18 or newer, and an
+[OpenRouter](https://openrouter.ai) key.
+
 ```bash
-make install   # uv sync
-make data      # download CUAD, load data/docintel.duckdb
-make test      # pytest; no network calls
-make lint      # ruff
+git clone <this repo> && cd doc-intell-pipeline
+cp .env.example .env          # then set OPENROUTER_API_KEY=sk-or-v1-...
+make install                  # Python packages
+make web-install              # UI packages
+make app                      # build the UI, serve UI + API on http://localhost:8000
 ```
 
-Put the OpenRouter key in `.env`, which is gitignored:
+Open http://localhost:8000 and click a sample. A short sample costs about $0.001 with the default model (DeepSeek V4
+Flash); a 14-page contract about $0.003. Set a credit
+limit on your OpenRouter key: the app has no spend cap of its own.
+
+To run the evals, load CUAD first (about 106 MB):
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-...
-DOCINTEL_MODEL=deepseek/deepseek-v4-flash   # the kept model; without this line, the code uses qwen/qwen3-235b-a22b-2507
-DOCINTEL_PROVIDER=parasail                  # optional; parasail is the default, and it has no backup
-```
-
-Main commands:
-
-```bash
-uv run python -m docintel.evals.runner run --split dev   # extract, retry (default 2), score, validate
+make data                                                # download CUAD, load data/docintel.duckdb
+uv run python -m docintel.evals.runner run --split dev   # extract, retry, score, validate
 uv run python -m docintel.evals.runner report <run_id>   # P/R/F1 per field, cost, latency
-uv run python -m docintel.evals.runner validate <run_id> # store issues again, review report
-uv run python -m docintel.evals.trust <run_id>           # first vs final answers, under 3 policies
-uv run python -m docintel.evals.parser_experiment text     # E3: CER, quotes, cost per parser cell
-uv run python -m docintel.evals.parser_experiment compare  # E3: F1 against cost per cell
 ```
 
-The app (Node 22.18 or newer for the UI):
+## Usage
+
+**API** (`make serve`, docs at http://localhost:8000/docs):
 
 ```bash
-make web-install   # npm ci in web/
-make app           # build the UI, then serve UI + API on http://localhost:8000
-make web           # while changing the UI: Vite on :5173, with `make serve` in another terminal
-make web-test      # UI type check + test
-make e2e           # build, then one Playwright test on a stored answer (no model call)
-uv run python web/e2e/fixtures.py export <request_id>   # a stored answer -> a test fixture
-make phoenix       # local trace viewer on http://localhost:6006
-make stats         # p50, p95, errors and cost of app requests; review counts
+curl localhost:8000/v1/fields                                                   # the 12 fields
+curl localhost:8000/v1/samples                                                  # 10 sample contracts
+curl -X POST localhost:8000/v1/extract -F sample_id=kubient -F fields=parties   # one answer, as JSON
+curl -N -X POST localhost:8000/v1/extract/stream -F pdf=@contract.pdf           # live stages, then the answer
+curl -X POST localhost:8000/v1/reviews -H 'Content-Type: application/json' \
+  -d '{"request_id": "...", "field": "renewal_term", "action": "accept"}'       # a review; DELETE to undo
 ```
 
-The API (`make serve`, then http://localhost:8000/docs):
+**Evals:**
 
 ```bash
-curl localhost:8000/v1/fields                      # the 12 fields, with labels and groups
-curl localhost:8000/v1/samples                     # 10 sample contracts (one is a fake scan)
-curl -X POST localhost:8000/v1/extract -F sample_id=kubient -F fields=parties   # paid, about $0.001
-curl -N -X POST localhost:8000/v1/extract/stream -F pdf=@contract.pdf           # live steps, then the answer
+uv run python -m docintel.evals.runner validate <run_id>   # replay the rules on a stored run
+uv run python -m docintel.evals.trust <run_id>             # first against final answers, under 3 policies
+uv run python -m docintel.evals.parser_experiment compare  # parser F1 against cost
 ```
 
-Each answer has the value, the quotes, their boxes on the page, and a needs-review flag with its reasons. With no
-`fields`, all 12 are returned.
+**Operations:** `make phoenix` (traces at http://localhost:6006), `make stats` (p50, p95, errors and cost of app
+requests), `make nb` (Jupyter on the DuckDB data).
 
-DuckDB tables:
-- `contracts`, `labels` and `splits` come from `make data`.
-- `llm_calls` logs tokens, cost and latency for each call.
-- `runs`, `predictions` and `scores` hold each eval run, its answers and its marks.
-- `scores_r1` keeps the marks from the old scoring rules (see E1.2).
-- `issues` holds each rule a field broke (errors and warnings); `attempts` holds every call of a retry
-  run, with its errors and cost.
-- Runs named `<run_id>-first`, `-blank-v`, ... are derived by `trust`: stored answers, no new calls.
-- `requests` holds one row per app extract (good or failed, with the full answer); `reviews` holds each Accept or
-  Modify on a field (one per field; `DELETE` undoes it).
-- `eval_sets` holds frozen doc sets (`e3`). E3 runs use `--split e3`, and `runs.parser` is the cell, such as
-  `deepseek_vl@heavy`. Parsed text is cached in `data/parse_cache/<cell>/`.
+## Development
 
-To browse the database, run `duckdb -readonly data/docintel.duckdb` or `make nb`.
+```bash
+make test       # pytest, no network calls
+make lint       # ruff
+make web-test   # UI type check + unit tests (node --test)
+make e2e        # Playwright: one sample from start to end, replayed from a stored answer (no model call)
+make web        # UI dev server on :5173 with hot reload (run `make serve` too)
+make clean      # remove caches and builds
+```
 
-## Resources
+Any stored answer can become a test fixture: `uv run python web/e2e/fixtures.py export <request_id>`.
 
-- **Project brief:** [AI Engineer Projects](https://github.com/aishwaryanr/awesome-generative-ai-guide/blob/main/youtube/ai-engineer-projects.md), Project 1 (aishwaryanr/awesome-generative-ai-guide)
-- **Data:** [CUAD v1](https://zenodo.org/records/4595826), the Contract Understanding Atticus Dataset. It has 510 contracts and 41 clause categories labelled by lawyers. License: CC BY 4.0.
-  - Paper: Hendrycks et al., [CUAD: An Expert-Annotated NLP Dataset for Legal Contract Review](https://arxiv.org/abs/2103.06268) (NeurIPS 2021)
-  - Project page: [atticusprojectai.org/cuad](https://www.atticusprojectai.org/cuad)
-  - Zip: [CUAD_v1.zip](https://zenodo.org/records/4595826/files/CUAD_v1.zip) (~106 MB, md5 `c38f490a984420b8a62600db401fafd5`). It is saved to `data/raw/`, which is gitignored.
-- **Doc style:** [testdriven.io FastAPI CRUD tutorial](https://testdriven.io/blog/fastapi-crud/)
+## Project layout
+
+```text
+src/docintel/
+  core/      settings, OpenRouter client (cost, retries), JSON logs, tracing
+  domain/    schema/ (the 12 fields) · parse/ · extract/ (prompts, retries) · validate/ · locate.py · pipeline.py
+  evals/     CUAD loader and splits, scorers, eval runner, trust replay, parser experiment
+  db/        app tables: requests and reviews
+  api/       FastAPI app, routes, 10 sample PDFs
+web/         React + Vite + TypeScript + daisyUI (lib/ rules · hooks/ · features/ screens), Playwright e2e
+tests/       pytest
+notebooks/   data exploration
+learn/       a build log: one write-up per part, from setup to the review app
+```
+
+## Limits
+
+- **Local, one user.** No auth, rate limits or spend cap. Putting it online is future work.
+- **Dev numbers.** The scoring rules and prompt were tuned on dev; the test split has not been run.
+- **Fake scans.** The parser comparison uses PDF pages turned into images with blur and noise, not real scans.
+- **Small parser sample.** 9 contracts show the trade-off; they are not a strong claim.
+
+## Docs
+
+- [PLAN.md](./PLAN.md): goals, decisions, the roadmap, and the data model.
+- [EXPERIMENTS.md](./EXPERIMENTS.md): every run, with its question, setup, results and limits.
+- [learn/](./learn): how each part was built and why, written for a JavaScript developer new to Python.
+
+## Acknowledgements
+
+- **Aishwarya Reganti**, for the project idea: this is Project 1, "Document intelligence pipeline", from
+  [AI Engineer Projects](https://github.com/aishwaryanr/awesome-generative-ai-guide/blob/main/youtube/ai-engineer-projects.md)
+  in [awesome-generative-ai-guide](https://github.com/aishwaryanr/awesome-generative-ai-guide). Thank you for the brief and
+  its four questions, which shaped every experiment here.
+- **The Atticus Project**, for [CUAD v1](https://zenodo.org/records/4595826) (CC BY 4.0). Paper: Hendrycks et al.,
+  [CUAD: An Expert-Annotated NLP Dataset for Legal Contract Review](https://arxiv.org/abs/2103.06268) (NeurIPS 2021).
+  The 10 sample PDFs in `src/docintel/api/samples/` (one turned into a fake scan) come from CUAD. `make data`
+  downloads the full dataset into `data/`, which is not committed.
+
+## License
+
+The code is under the [MIT License](./LICENSE). The CUAD sample PDFs keep their CC BY 4.0 license.

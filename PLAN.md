@@ -238,7 +238,7 @@ src/docintel/
   api/       app.py (request_id middleware) · routes.py · fields.py · schemas.py · samples.py · samples/ (10 sample PDFs)
 web/         React + Vite + daisyUI app (built to web/dist, served by FastAPI)
 learn/       phase docs · notebooks/ · tests/
-Makefile · PLAN.md · EXPERIMENTS.md · README.md · CLAUDE.md
+Makefile · PLAN.md · EXPERIMENTS.md · README.md · LICENSE · CLAUDE.md
 ```
 
 This project is local-first, so it leaves out parts of the shared layout: `evals/mini/` and the CI eval gate,
@@ -247,6 +247,26 @@ Postgres, no migrations tool).
 
 Agentic pattern: each capability (`extract`, `parse`, `locate`) is a typed function (Pydantic in,
 Pydantic out) with a trace span, called by the API, the eval runner, and later as an agent tool.
+
+## Data model (DuckDB tables)
+
+Everything lives in one file, `data/docintel.duckdb`. Browse it with `duckdb -readonly data/docintel.duckdb` or `make nb`.
+
+- `contracts`, `labels` and `splits` come from `make data`.
+- `llm_calls` logs tokens, cost and latency for each call.
+- `runs`, `predictions` and `scores` hold each eval run, its answers and its marks.
+- `scores_r1` keeps the marks from the old scoring rules (see E1.2).
+- `issues` holds each rule a field broke (errors and warnings); `attempts` holds every call of a retry run, with its
+  errors and cost.
+- Runs named `<run_id>-first`, `-blank-v`, ... are derived by `trust`: stored answers, no new calls.
+- `eval_sets` holds frozen doc sets (`e3`). E3 runs use `--split e3`, and `runs.parser` is the cell, such as
+  `deepseek_vl@heavy`. Parsed text is cached in `data/parse_cache/<cell>/`.
+- `requests` holds one row per app extract (good or failed, with the full answer); `reviews` holds each Accept or
+  Modify on a field (one per field; `DELETE` undoes it).
+
+Settings (`.env`): `OPENROUTER_API_KEY`; `DOCINTEL_MODEL` (default `deepseek/deepseek-v4-flash`, the model kept in
+E1.1); `DOCINTEL_PROVIDER` (default `parasail`, with no backup provider); `TRACING` (default on); `APP_DB` (the app
+tables; tests use a temp file).
 
 ## Experiment discipline (every phase)
 
@@ -296,9 +316,8 @@ day. Parts were merged to fit; the router and the free-text planner are cut (REA
 | 3 | 4b | traces + logs | request_id middleware, structlog JSON logs, OTel spans (parse, extract, attempt, check, highlight) + OpenInference, local Phoenix (`make phoenix`), how to read a trace | done |
 | 3 | 4b2 | requests + reviews | `requests` + `reviews` in DuckDB, `POST /v1/reviews` + `DELETE` undo, `make stats` (p50/p95/errors/cost) | done |
 | 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | done |
-| 3 | 4c2 | PDF pane + highlights | UI split into `lib/`, `hooks/`, `features/`; react-pdf pane, quote boxes, evidence boxes in amber, click to scroll and pulse | doc ready |
-| 3 | 4c3 | review + e2e + demo | review card (Modify / Accept, undo), Passed, Copy JSON, fixtures from stored answers, one Playwright e2e, demo script | doc ready |
-| 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
+| 3 | 4c2 | PDF pane + highlights | UI split into `lib/`, `hooks/`, `features/`; react-pdf pane, quote boxes, evidence boxes in amber, click to scroll and pulse | done |
+| 3 | 4c3 | review + e2e + demo | review card (Modify / Accept, undo), Passed, Copy JSON, fixtures from stored answers, one Playwright e2e, demo script | done |
 
 ---
 
@@ -588,21 +607,6 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > (pure rules), `hooks/` (effects) and `features/` (screens), as the user asked. 4c3 is the review card, Passed, Copy
 > JSON, the e2e test and the demo script. The e2e test uses stored answers from `requests` as fixtures (user's idea):
 > `web/e2e/fixtures.py export` and `seed`, so it never calls the model.
-
----
-
-## Phase 5: write-up
-
-**Done when:** README answers the 4 hiring questions with numbers traceable to run_ids; the user
-passes a mock interview.
-
-> **5 Write-up + interview:** "Final figures from DuckDB (per-field P/R, parser quality vs cost,
-> retry lift), each citing its run_id, and a mermaid diagram. Guide me through the README
-> narrative (problem, data choice, architecture, results, trade-offs, failures, next, including
-> the router, a free-text planner, and "putting it online" (auth, limits, spend cap, Postgres, Docker, CI) as future work),
-> with the demo video from 4c2. I write it. Then act as a hiring manager: 10 hard questions one at
-> a time (deploy, monitoring, security, scaling), no help, grade at the end with gaps to study.
-> Then tick checklist items in ../PLAN.md."
 
 ---
 
