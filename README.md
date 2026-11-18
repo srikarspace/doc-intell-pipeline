@@ -19,7 +19,7 @@ Built from **Project 1: Document intelligence pipeline** in [AI Engineer Project
 | 1 baseline extraction | [1a](./learn/phase-1a.md) schema · [1a2](./learn/phase-1a2.md) LLM client · [1b](./learn/phase-1b.md) prompt + extract · [1b2](./learn/phase-1b2.md) scoring · [1c](./learn/phase-1c.md) store + score · [1c2](./learn/phase-1c2.md) batch run · [1c3](./learn/phase-1c3.md) E1 results · [1c4](./learn/phase-1c4.md) model comparison · [1d](./learn/phase-1d.md) scoring review · [1d2](./learn/phase-1d2.md) prompt v2 | done |
 | 2 trust layer | [2a](./learn/phase-2a.md) validators + citations · [2a2](./learn/phase-2a2.md) needs-review rules · [2b](./learn/phase-2b.md) retry loop · [2b2](./learn/phase-2b2.md) trust replay tool · [2b3](./learn/phase-2b3.md) trust run | done |
 | 3 parser comparison | [3a](./learn/phase-3a.md) interface + pypdf · [3a2](./learn/phase-3a2.md) Docling · [3a3](./learn/phase-3a3.md) vision LLM · [3b](./learn/phase-3b.md) fake scans + CER · [3b2](./learn/phase-3b2.md) experiment design · [3b3](./learn/phase-3b3.md) E3 run | done |
-| 4 product | [4a](./learn/phase-4a.md) API · [4a2](./learn/phase-4a2.md) highlights + stream · [4b](./learn/phase-4b.md) traces + logs · [4b2](./learn/phase-4b2.md) requests + reviews · 4c UI · 4c2 review + demo | in progress (4a, 4a2 done) |
+| 4 product | [4a](./learn/phase-4a.md) API · [4a2](./learn/phase-4a2.md) highlights + stream · [4b](./learn/phase-4b.md) traces + logs · [4b2](./learn/phase-4b2.md) requests + reviews · [4c](./learn/phase-4c.md) UI shell · 4c2 review + demo | in progress (4a to 4b2 done) |
 | 5 write-up | figures, README, mock interview | planned |
 
 ## Results so far (dev, 52 contracts, 12 fields)
@@ -61,9 +61,9 @@ There are two notes for each part. `learn/phase-N.md` covers what the part build
 
 ## Stack
 
-Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers · FastAPI + sse-starlette (API and live stream) · pypdfium2 (quote boxes).
+Python 3.12, uv, pytest, ruff · OpenRouter (DeepSeek V4 Flash, kept in E1.1; `response_format: json_schema`, `require_parameters: true`) · Pydantic · DuckDB · pypdf, Docling and vision LLM parsers · FastAPI + sse-starlette (API and live stream) · pypdfium2 (quote boxes) · structlog JSON logs and local Phoenix traces · React + Vite + TypeScript + Tailwind + daisyUI, TanStack Query, eventsource-parser (UI, served by FastAPI).
 
-Planned additions: structlog JSON logs and local Phoenix traces (4b), app tables for requests and reviews in DuckDB (4b2), and a React (Vite) + daisyUI app served by FastAPI (4c, 4c2). It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
+Planned additions: the PDF pane with highlights and the review card (4c2). It runs locally, for one user. Putting it online (auth, limits, spend cap, Postgres, Docker, CI) is future work.
 
 ## Quickstart
 
@@ -93,6 +93,17 @@ uv run python -m docintel.evals.parser_experiment text     # E3: CER, quotes, co
 uv run python -m docintel.evals.parser_experiment compare  # E3: F1 against cost per cell
 ```
 
+The app (Node 22.18 or newer for the UI):
+
+```bash
+make web-install   # npm ci in web/
+make app           # build the UI, then serve UI + API on http://localhost:8000
+make web           # while changing the UI: Vite on :5173, with `make serve` in another terminal
+make web-test      # UI type check + test
+make phoenix       # local trace viewer on http://localhost:6006
+make stats         # p50, p95, errors and cost of app requests; review counts
+```
+
 The API (`make serve`, then http://localhost:8000/docs):
 
 ```bash
@@ -113,6 +124,8 @@ DuckDB tables:
 - `issues` holds each rule a field broke (errors and warnings); `attempts` holds every call of a retry
   run, with its errors and cost.
 - Runs named `<run_id>-first`, `-blank-v`, ... are derived by `trust`: stored answers, no new calls.
+- `requests` holds one row per app extract (good or failed, with the full answer); `reviews` holds each Accept or
+  Modify on a field (one per field; `DELETE` undoes it).
 - `eval_sets` holds frozen doc sets (`e3`). E3 runs use `--split e3`, and `runs.parser` is the cell, such as
   `deepseek_vl@heavy`. Parsed text is cached in `data/parse_cache/<cell>/`.
 

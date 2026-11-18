@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* daisyUI gives the components (btn, badge, skeleton, ...). Our two themes give the colors. */
+@plugin "daisyui" {
+  themes: false;
+}
+
+/* The prototype's colors. One accent (primary) for buttons, chips and the loading ring.
+   Amber (warning) is only for "needs review". */
+@plugin "daisyui/theme" {
+  name: "docintel";
+  default: true;
+  color-scheme: light;
+  --color-base-100: #ffffff; /* cards */
+  --color-base-200: #f6f6f9; /* the page */
+  --color-base-300: #e6e7ee; /* lines */
+  --color-base-content: #1c1e26;
+  --color-primary: #6656f0;
+  --color-primary-content: #ffffff;
+  --color-neutral: #1c1e26;
+  --color-neutral-content: #ffffff;
+  --color-success: #14a04a;
+  --color-success-content: #ffffff;
+  --color-warning: #c97d00;
+  --color-warning-content: #ffffff;
+  --color-error: #d0342c;
+  --color-error-content: #ffffff;
+  --radius-box: 1.25rem;
+  --radius-field: 0.625rem;
+  --radius-selector: 0.5rem;
+}
+
+@plugin "daisyui/theme" {
+  name: "docintel-dark";
+  prefersdark: true;
+  color-scheme: dark;
+  --color-base-100: #16171d;
+  --color-base-200: #0e0f13;
+  --color-base-300: #262833;
+  --color-base-content: #eceef4;
+  --color-primary: #9a8cff;
+  --color-primary-content: #120f2a;
+  --color-neutral: #eceef4;
+  --color-neutral-content: #0e0f13;
+  --color-success: #3fcf7b;
+  --color-success-content: #0e0f13;
+  --color-warning: #f2b13d;
+  --color-warning-content: #0e0f13;
+  --color-error: #f0726b;
+  --color-error-content: #0e0f13;
+  --radius-box: 1.25rem;
+  --radius-field: 0.625rem;
+  --radius-selector: 0.5rem;
+}
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html {
+  background-color: var(--color-base-200);
+}
+body {
+  min-height: 100vh;
+  background-color: var(--color-base-200);
+  background-image: radial-gradient(color-mix(in oklab, var(--color-base-content) 14%, transparent) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+}
+
+/* A quiet button: "New contract" and "Try again". */
+@utility btn-quiet {
+  @apply inline-flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 text-[13px] text-base-content/70 hover:border-base-content/40 hover:text-base-content;
+}
+
+/* The ring that turns around the pill while it works. */
+@property --turn {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.ring-busy {
+  position: relative;
+  border-color: transparent;
+}
+.ring-busy::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  z-index: -1;
+  background: conic-gradient(
+    from var(--turn),
+    var(--color-primary),
+    color-mix(in oklab, var(--color-primary) 12%, transparent) 50%,
+    var(--color-primary)
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: turn 2.2s linear infinite;
+}
+@keyframes turn {
+  to {
+    --turn: 360deg;
+  }
+}
+
+/* A small "pop" when a row's icon or the pill appears. */
+.pop {
+  animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

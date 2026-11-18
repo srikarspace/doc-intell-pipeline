@@ -1,4 +1,4 @@
-.PHONY: install data test lint fmt serve stats nb phoenix
+.PHONY: install data test lint fmt serve stats nb phoenix web-install web web-test app
 
 install:  ## install all deps (incl. dev) into .venv
 	uv sync
@@ -31,3 +31,16 @@ phoenix:  ## run Phoenix on http://localhost:6006 (traces are kept in data/phoen
 	PHOENIX_AGENTS_DISABLE_BASH=true PHOENIX_AGENTS_DISABLE_WEB_ACCESS=true \
 	PHOENIX_AGENTS_DISABLE_GITHUB=true \
 	uvx --from arize-phoenix==21.0.0 phoenix serve
+
+web-install:  ## install the UI's npm packages into web/node_modules (exact versions from the lockfile)
+	cd web && npm ci
+
+web:  ## run the UI on http://localhost:5173 (needs `make serve` in another terminal)
+	cd web && npm run dev
+
+web-test:  ## check the UI's types, then run its test
+	cd web && npm run typecheck && npm test
+
+app:  ## build the UI into web/dist, then serve the UI and the API on http://localhost:8000
+	cd web && npm run build
+	uv run uvicorn docintel.api.app:app --no-access-log

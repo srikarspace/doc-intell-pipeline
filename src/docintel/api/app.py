@@ -3,15 +3,18 @@
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 
 from docintel.api.routes import VERSION, router
 from docintel.core.logs import setup_logging
 from docintel.core.tracing import setup_tracing
 
 log = structlog.get_logger()
+WEB_DIST = Path("web/dist")  # the built UI, from `make app`; relative to the repo, like data/
 
 
 @asynccontextmanager
@@ -30,6 +33,11 @@ app = FastAPI(
     title="docintel", version=VERSION, lifespan=lifespan, telemetry={"exclude": not_traced}
 )
 app.include_router(router)
+
+# The UI, at the same address as the API, so the browser needs no CORS. Added after the routes, so
+# /v1/... and /health still go to the API. Only there after `make app` builds it.
+if WEB_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
 
 
 @app.middleware("http")

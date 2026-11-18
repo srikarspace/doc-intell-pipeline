@@ -293,9 +293,9 @@ day. Parts were merged to fit; the router and the free-text planner are cut (REA
 | 2 | 3b3 | parser experiment | parse + pipeline per cell, compare table, chart, E3 | done |
 | 3 | 4a | API | FastAPI app, `run_pipeline`, `Literal` field names + `GET /v1/fields`, samples + upload, parser by PDF, limits, time limit | done |
 | 3 | 4a2 | highlights + stream | quote -> page boxes (`locate`), evidence lines for "maybe missed", stage events, `POST /v1/extract/stream` (SSE) | done |
-| 3 | 4b | traces + logs | request_id middleware, structlog JSON logs, OTel spans (parse, extract, attempt, check, highlight) + OpenInference, local Phoenix (`make phoenix`), how to read a trace | doc ready |
-| 3 | 4b2 | requests + reviews | `requests` + `reviews` in DuckDB, `POST /v1/reviews` + `DELETE` undo, `make stats` (p50/p95/errors/cost) | doc ready |
-| 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | planned |
+| 3 | 4b | traces + logs | request_id middleware, structlog JSON logs, OTel spans (parse, extract, attempt, check, highlight) + OpenInference, local Phoenix (`make phoenix`), how to read a trace | done |
+| 3 | 4b2 | requests + reviews | `requests` + `reviews` in DuckDB, `POST /v1/reviews` + `DELETE` undo, `make stats` (p50/p95/errors/cost) | done |
+| 3 | 4c | UI shell | React + Vite + daisyUI: field chips, drop zone, sample tiles, analyze card (stage pill, row reveal, Issue found / Passed), `make app` | doc ready |
 | 3 | 4c2 | UI review + demo | react-pdf pane + quote and evidence highlights, review card (Modify / Accept, undo), Passed, Copy JSON, one Playwright e2e, demo video | planned |
 | 3 | 5 | write-up + interview | figures with run_ids, README narrative, mock interview | planned |
 
@@ -572,6 +572,10 @@ on the internet for many users (auth, limits, spend cap, Postgres, Docker, CI), 
 > Analyzing / Issue found / Passed), cost footer, 'New contract' at the top. `fetch` +
 > eventsource-parser for the stream. `make web` (Vite dev server with a proxy to the API) and `make app` (build
 > `web/dist`, then FastAPI serves it with the API). Claude may scaffold; the user reviews and explains it back."
+
+> For 4c and 4c2, Claude writes the UI code too (the user's choice: strong UI experience), and the doc is a "read and
+> run" walkthrough. The user reviews the code and explains it back before committing. The test uses Node's own runner
+> (`node --test`), because npm 10.9.2 crashes when it installs vitest.
 
 > **4c2 UI review + demo:** "Needs 4c. react-pdf pane (pdf.js eval off) with our highlight overlay: click a row,
 > scroll to its page, pulse its boxes; evidence boxes in amber. Review card under a '!' row (why flagged in plain

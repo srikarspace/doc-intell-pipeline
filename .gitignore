@@ -223,3 +223,6 @@ __marimo__/
 data/
 
 *vscode
+
+# UI packages and build (web/dist is also covered by dist/ above)
+web/node_modules/

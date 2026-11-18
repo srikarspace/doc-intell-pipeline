@@ -1,0 +1,305 @@
+[
+ {
+  "event": "stage",
+  "data": {
+   "name": "parse",
+   "status": "start"
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "parse",
+   "status": "done",
+   "parser": "pypdf",
+   "pages": 2
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "extract",
+   "status": "start"
+  }
+ },
+ {
+  "event": "attempt",
+  "data": {
+   "n": 0,
+   "errors": 0
+  }
+ },
+ {
+  "event": "stage",
+  "data": {
+   "name": "check",
+   "status": "start"
+  }
+ },
+ {
+  "event": "result",
+  "data": {
+   "request_id": "10419b08-bd6b-4971-abe1-4aebbecba884",
+   "document": {
+    "filename": "kubient.pdf",
+    "sha256": "e73f886d87570c89ca74b156eb6e9e0a00f0bc538898e603e6104896de33933c",
+    "sample_id": "kubient"
+   },
+   "fields": {
+    "parties": {
+     "found": true,
+     "value": [
+      "Kubient, Inc.",
+      "The Associated Press"
+     ],
+     "quotes": [
+      "Kubient, Inc. (\"Kubient\")",
+      "The Associated Press (\"Customer\")"
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         318.9,
+         772.5,
+         398.5,
+         780.1
+        ]
+       ]
+      },
+      {
+       "quote_index": 1,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         423.7,
+         772.5,
+         536.6,
+         780.1
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "agreement_date": {
+     "found": true,
+     "value": "2020-03-26",
+     "quotes": [
+      "as of the 26th day of March 2020"
+     ],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         149.8,
+         772.5,
+         261.3,
+         780.1
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "governing_law": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "non_compete": {
+     "found": true,
+     "value": null,
+     "quotes": [
+      "During the Term and any renewal terms of the Agreement, and for a period of one (1) year following the expiration or earlier termination thereof, Customer agrees not to work with, directly or indirectly, any Third-Party that Customer comes to know through disclosure by Kubient as part of the Services, without the express written consent of Kubient and compensation to Kubient under the applicable exhibit and/or schedule."
+     ],
+     "needs_review": true,
+     "issues": [
+      {
+       "field": "non_compete",
+       "rule": "quote_off_topic",
+       "severity": "warn",
+       "detail": "During the Term and any renewal terms of the Agreement, and for a period of one "
+      }
+     ],
+     "highlights": [
+      {
+       "quote_index": 0,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         389.5,
+         621.0,
+         544.7,
+         628.6
+        ],
+        [
+         50.1,
+         610.9,
+         545.0,
+         618.5
+        ],
+        [
+         50.3,
+         600.8,
+         545.0,
+         608.4
+        ],
+        [
+         50.3,
+         590.7,
+         347.7,
+         598.3
+        ]
+       ]
+      }
+     ],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "change_of_control": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "anti_assignment": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "renewal_term": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": true,
+     "issues": [
+      {
+       "field": "renewal_term",
+       "rule": "maybe_missed",
+       "severity": "warn",
+       "detail": "renew"
+      }
+     ],
+     "highlights": [],
+     "evidence": [
+      "partners (collectively \"Third-Party\") with whom Customer does not have a pre-existing relationship. During the Term and any renewal terms of the"
+     ],
+     "evidence_highlights": [
+      {
+       "quote_index": 0,
+       "page": 1,
+       "page_size": [
+        595.0,
+        842.0
+       ],
+       "rects": [
+        [
+         50.0,
+         621.0,
+         544.7,
+         628.6
+        ]
+       ]
+      }
+     ]
+    },
+    "notice_period_to_terminate_renewal": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "cap_on_liability": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "license_grant": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "ip_ownership_assignment": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    },
+    "non_transferable_license": {
+     "found": false,
+     "value": null,
+     "quotes": [],
+     "needs_review": false,
+     "issues": [],
+     "highlights": [],
+     "evidence": [],
+     "evidence_highlights": []
+    }
+   },
+   "needs_review": true,
+   "parser": "pypdf",
+   "pages": 2,
+   "cost_usd": 0.00108584,
+   "latency_ms": 18617
+  }
+ }
+]
